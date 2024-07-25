@@ -2,8 +2,10 @@ cmake_minimum_required(VERSION 3.20)
 
 project(vesccom)
 
-# Use upstream BoostConfig instead of deprecated FindBoost.
-cmake_policy(SET CMP0167 NEW)
+if(POLICY CMP0167)
+    # Use upstream BoostConfig instead of deprecated FindBoost.
+    cmake_policy(SET CMP0167 NEW)
+endif()
 find_package(Boost REQUIRED)
 
 set(CMAKE_CXX_STANDARD 17)
