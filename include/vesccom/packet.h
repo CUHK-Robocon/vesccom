@@ -5,8 +5,6 @@
 #include <cstdint>
 #include <vector>
 
-#include "boost/outcome.hpp"
-
 namespace vesccom {
 
 struct packet_parse_state {
@@ -18,16 +16,24 @@ struct packet_parse_state {
   size_t payload_len;
 };
 
-enum packet_parse_error {
+enum packet_parse_status {
+  SUCCESS,
+  INSUFFICIENT_DATA,
   INVALID_TYPE,
   PAYLOAD_TOO_LONG,
   CHECKSUM_MISMATCH,
   INVALID_TERM,
 };
 
-boost::outcome_v2::result<size_t, packet_parse_error> packet_parse(
-    const uint8_t* data, size_t size, std::vector<uint8_t>& payload_out,
-    packet_parse_state& state);
+struct packet_parse_result {
+  packet_parse_status status;
+
+  size_t bytes_needed;
+};
+
+packet_parse_result packet_parse(const uint8_t* data, size_t size,
+                                 std::vector<uint8_t>& payload_out,
+                                 packet_parse_state& state);
 
 // In-place wraps the provided payload into a packet.
 //

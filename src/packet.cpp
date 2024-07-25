@@ -18,13 +18,17 @@ const size_t PACKET_TYPE_SIZE = 1;
 const size_t PACKET_CHECKSUM_SIZE = 2;
 const size_t PACKET_TERM_SIZE = 1;
 
-boost::outcome_v2::result<size_t, packet_parse_error> packet_parse(
-    const uint8_t* data, size_t size, std::vector<uint8_t>& payload_out,
-    packet_parse_state& state) {
+packet_parse_result packet_parse(const uint8_t* data, size_t size,
+                                 std::vector<uint8_t>& payload_out,
+                                 packet_parse_state& state) {
   switch (state.stage) {
     case 0:
-      if (size < state.cursor + PACKET_TYPE_SIZE)
-        return boost::outcome_v2::success(state.cursor + 1 - size);
+      if (size < state.cursor + PACKET_TYPE_SIZE) {
+        return {
+            .status = packet_parse_status::INSUFFICIENT_DATA,
+            .bytes_needed = state.cursor + 1 - size,
+        };
+      }
 
       state.type = data[state.cursor];
 
@@ -35,7 +39,7 @@ boost::outcome_v2::result<size_t, packet_parse_error> packet_parse(
       } else if (state.type == 4) {
         state.payload_len_size = 3;
       } else {
-        return boost::outcome_v2::failure(packet_parse_error::INVALID_TYPE);
+        return {.status = packet_parse_status::INVALID_TYPE};
       }
 
       ++state.cursor;
@@ -43,8 +47,10 @@ boost::outcome_v2::result<size_t, packet_parse_error> packet_parse(
 
     case 1: {
       if (size < state.cursor + state.payload_len_size) {
-        return boost::outcome_v2::success(state.cursor +
-                                          state.payload_len_size - size);
+        return {
+            .status = packet_parse_status::INSUFFICIENT_DATA,
+            .bytes_needed = state.cursor + state.payload_len_size - size,
+        };
       }
 
       boost::endian::big_uint24_buf_t payload_len_buf(0);
@@ -54,7 +60,7 @@ boost::outcome_v2::result<size_t, packet_parse_error> packet_parse(
       state.payload_len = payload_len_buf.value();
 
       if (state.payload_len > PACKET_PAYLOAD_MAX_LEN)
-        return boost::outcome_v2::failure(packet_parse_error::PAYLOAD_TOO_LONG);
+        return {.status = packet_parse_status::PAYLOAD_TOO_LONG};
 
       state.cursor += state.payload_len_size;
       ++state.stage;
@@ -63,15 +69,17 @@ boost::outcome_v2::result<size_t, packet_parse_error> packet_parse(
     case 2: {
       if (size < state.cursor + state.payload_len + PACKET_CHECKSUM_SIZE +
                      PACKET_TERM_SIZE) {
-        return boost::outcome_v2::success(state.cursor + state.payload_len +
-                                          PACKET_CHECKSUM_SIZE +
-                                          PACKET_TERM_SIZE - size);
+        return {
+            .status = packet_parse_status::INSUFFICIENT_DATA,
+            .bytes_needed = state.cursor + state.payload_len +
+                            PACKET_CHECKSUM_SIZE + PACKET_TERM_SIZE - size,
+        };
       }
 
       uint8_t term =
           data[state.cursor + state.payload_len + PACKET_CHECKSUM_SIZE];
       if (term != PACKET_TERM_BYTE)
-        return boost::outcome_v2::failure(packet_parse_error::INVALID_TERM);
+        return {.status = packet_parse_status::INVALID_TERM};
 
       boost::crc_xmodem_t crc;
       crc.process_bytes(data + state.cursor, state.payload_len);
@@ -82,10 +90,8 @@ boost::outcome_v2::result<size_t, packet_parse_error> packet_parse(
              data + state.cursor + state.payload_len, PACKET_CHECKSUM_SIZE);
       uint16_t checksum_expected = checksum_expected_buf.value();
 
-      if (checksum != checksum_expected) {
-        return boost::outcome_v2::failure(
-            packet_parse_error::CHECKSUM_MISMATCH);
-      }
+      if (checksum != checksum_expected)
+        return {.status = packet_parse_status::CHECKSUM_MISMATCH};
 
       payload_out.insert(payload_out.end(), data + state.cursor,
                          data + state.cursor + state.payload_len);
@@ -94,7 +100,7 @@ boost::outcome_v2::result<size_t, packet_parse_error> packet_parse(
           state.payload_len + PACKET_CHECKSUM_SIZE + PACKET_TERM_SIZE;
       state.stage = 0;
 
-      return boost::outcome_v2::success(0);
+      return {.status = packet_parse_status::SUCCESS};
     }
 
     default:
