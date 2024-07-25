@@ -21,12 +21,17 @@
 //
 // Changelog
 // 1. Removed "ch.h" include and extract `systime_t` definition.
+// 2. Add `extern "C"` for C++.
 
 #ifndef DATATYPES_H_
 #define DATATYPES_H_
 
 #include <stdint.h>
 #include <stdbool.h>
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 typedef int32_t systime_t;
 
@@ -1463,5 +1468,9 @@ typedef struct __attribute__((packed)) {
 	uint32_t hw_config_init_flag;
 	uint8_t hw_config[128];
 } backup_data;
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* DATATYPES_H_ */
