@@ -7,6 +7,17 @@
 
 namespace vesccom {
 
+const size_t PACKET_TYPE_SIZE = 1;
+const size_t PACKET_CHECKSUM_SIZE = 2;
+const size_t PACKET_TERM_SIZE = 1;
+
+const size_t PACKET_PAYLOAD_LEN_MAX_SIZE = 3;
+const size_t PACKET_PAYLOAD_MAX_LEN = 512;
+
+const size_t PACKET_MAX_SIZE = PACKET_TYPE_SIZE + PACKET_PAYLOAD_LEN_MAX_SIZE +
+                               PACKET_PAYLOAD_MAX_LEN + PACKET_CHECKSUM_SIZE +
+                               PACKET_TERM_SIZE;
+
 struct packet_parse_state {
   int stage = 0;
   ptrdiff_t cursor = 0;

@@ -12,12 +12,6 @@ namespace vesccom {
 
 const uint8_t PACKET_TERM_BYTE = 0x03;
 
-const size_t PACKET_PAYLOAD_MAX_LEN = 512;
-
-const size_t PACKET_TYPE_SIZE = 1;
-const size_t PACKET_CHECKSUM_SIZE = 2;
-const size_t PACKET_TERM_SIZE = 1;
-
 packet_parse_result packet_parse(const uint8_t* data, size_t size,
                                  std::vector<uint8_t>& payload_out,
                                  packet_parse_state& state) {

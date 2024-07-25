@@ -7,6 +7,7 @@
 #include <vector>
 
 #include "boost/asio.hpp"
+#include "vesccom/packet.h"
 
 namespace vesccom {
 
@@ -17,6 +18,12 @@ class vesc {
   // Reads and blocks until `size` bytes have been read.
   std::vector<uint8_t> read(size_t size);
   void write(const void* buf, size_t size);
+
+  // Receives a packet. Blocks until a complete packet is received.
+  //
+  // Payload is appended to `payload_out` iif the returned status is
+  // `packet_parse_status::SUCCESS`.
+  packet_parse_status receive_to(std::vector<uint8_t>& payload_out);
 
   // Sends `payload` while mutating the original vector.
   //
