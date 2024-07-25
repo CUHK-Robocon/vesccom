@@ -39,9 +39,16 @@ enum packet_parse_status {
 struct packet_parse_result {
   packet_parse_status status;
 
+  // Initialized if `status` is `packet_parse_status::INSUFFICIENT_DATA`,
+  // uninitialized otherwise.
   size_t bytes_needed;
 };
 
+// Parse packet from the data provided.
+//
+// A default-initialized `packet_parse_state` instance MUST be provided. Payload
+// is appended to `payload_out` iif the returned `packet_parse_result.status` is
+// `packet_parse_status::SUCCESS`.
 packet_parse_result packet_parse(const uint8_t* data, size_t size,
                                  std::vector<uint8_t>& payload_out,
                                  packet_parse_state& state);
