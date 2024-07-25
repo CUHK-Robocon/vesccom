@@ -126,11 +126,13 @@ void packet_wrap(std::vector<uint8_t>& payload) {
   boost::endian::big_uint16_buf_t checksum_buf(crc.checksum());
 
   // Header, inserted before payload.
-  payload.insert(payload.begin(), type);
-  payload.insert(
-      payload.begin(),
+  std::vector<uint8_t> header_buf;
+  header_buf.push_back(type);
+  header_buf.insert(
+      header_buf.end(),
       payload_len_buf.data() + sizeof(payload_len_buf) - payload_len_size,
       payload_len_buf.data() + sizeof(payload_len_buf));
+  payload.insert(payload.begin(), header_buf.begin(), header_buf.end());
 
   // Footer, inserted after payload.
   payload.insert(payload.end(), checksum_buf.data(),
