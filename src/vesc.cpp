@@ -55,4 +55,12 @@ void vesc::send_payload_mut(std::vector<uint8_t>& payload) {
   write(payload.data(), payload.size());
 }
 
+void vesc::send_payload(const uint8_t* data, size_t size) {
+  std::vector<uint8_t> buf;
+
+  buf.insert(buf.end(), data, data + size);
+
+  send_payload_mut(buf);
+}
+
 }  // namespace vesccom

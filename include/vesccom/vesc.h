@@ -29,6 +29,7 @@ class vesc {
   //
   // Note that `payload` will be in-place modified.
   void send_payload_mut(std::vector<uint8_t>& payload);
+  void send_payload(const uint8_t* data, size_t size);
 
  private:
   // Must be declared before `serial_` for the correct initialization order.
