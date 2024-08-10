@@ -58,6 +58,12 @@ packet_parse_result packet_parse(const uint8_t* data, size_t size,
 // Note that the provided vector will be modified directly.
 void packet_wrap(std::vector<uint8_t>& payload);
 
+// In-place wraps the provided payload into a `COMM_FORWARD_CAN` payload.
+//
+// Note that the provided vector will be modified directly.
+void forward_can_wrap(uint8_t target_controller_id,
+                      std::vector<uint8_t>& payload);
+
 }  // namespace vesccom
 
 #endif

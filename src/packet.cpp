@@ -5,6 +5,7 @@
 #include <limits>
 #include <stdexcept>
 
+#include "bldc/datatypes.h"
 #include "boost/crc.hpp"
 #include "boost/endian.hpp"
 
@@ -138,6 +139,12 @@ void packet_wrap(std::vector<uint8_t>& payload) {
   payload.insert(payload.end(), checksum_buf.data(),
                  checksum_buf.data() + sizeof(checksum_buf));
   payload.push_back(PACKET_TERM_BYTE);
+}
+
+void forward_can_wrap(uint8_t target_controller_id,
+                      std::vector<uint8_t>& payload) {
+  uint8_t header_buf[] = {COMM_FORWARD_CAN, target_controller_id};
+  payload.insert(payload.begin(), header_buf, header_buf + sizeof(header_buf));
 }
 
 }  // namespace vesccom
