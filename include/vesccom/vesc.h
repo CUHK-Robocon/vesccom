@@ -16,7 +16,7 @@ namespace vesccom {
 class vesc {
  public:
   // Constructs an instance representing a master VESC.
-  explicit vesc(const char* device, int baud_rate = 115200);
+  explicit vesc(const char* device_path, int baud_rate = 115200);
 
   // Constructs an instance representing a slave VESC.
   vesc(vesc& master, uint8_t controller_id);

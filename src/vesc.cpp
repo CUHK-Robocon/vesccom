@@ -8,7 +8,8 @@
 
 namespace vesccom {
 
-vesc::vesc(const char* device, int baud_rate) : serial_(io_ctx_, device) {
+vesc::vesc(const char* device_path, int baud_rate)
+    : serial_(io_ctx_, device_path) {
   serial_.set_option(boost::asio::serial_port_base::baud_rate(baud_rate));
 
   {
