@@ -43,6 +43,11 @@ class vesc {
 
   void send_payload(const uint8_t* data, size_t size);
 
+  void set_duty_cycle(double duty_cycle);
+  void set_erpm(int erpm);
+  void set_current(double current);
+  void set_pos(double pos);
+
  private:
   static void keep_alive_thread_f();
 
