@@ -192,7 +192,10 @@ void vesc::write(const void* buf, size_t size) {
     return;
   }
 
-  if (serial_master_) return serial_master_->write(buf, size);
+  if (serial_master_) {
+    serial_master_->write(buf, size);
+    return;
+  }
 
   std::lock_guard<std::mutex> lock(serial_write_mutex_);
 
