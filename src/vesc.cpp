@@ -30,6 +30,7 @@ vesc::vesc(vesc& serial_master, uint8_t controller_id)
   }
 }
 
+#ifdef __linux__
 vesc::vesc(socketcan_master& can_master, uint8_t controller_id)
     : serial_(io_ctx_),
       can_master_(&can_master),
@@ -40,6 +41,7 @@ vesc::vesc(socketcan_master& can_master, uint8_t controller_id)
     keep_alive_instances_.insert(this);
   }
 }
+#endif
 
 vesc::~vesc() {
   std::lock_guard<std::mutex> lock(keep_alive_state_mutex_);
@@ -89,11 +91,17 @@ packet_parse_status vesc::receive_to(std::vector<uint8_t>& payload_out) {
 }
 
 void vesc::send_payload_mut(std::vector<uint8_t>& payload) {
+#ifdef __linux__
   if (!can_master_) {
+#endif
+
     if (serial_master_) forward_can_wrap(controller_id_, payload);
 
     packet_wrap(payload);
+
+#ifdef __linux__
   }
+#endif
 
   write(payload.data(), payload.size());
 }
@@ -187,10 +195,12 @@ std::vector<uint8_t> vesc::read(size_t size) {
 }
 
 void vesc::write(const void* buf, size_t size) {
+#ifdef __linux__
   if (can_master_) {
     can_master_->write(controller_id_, static_cast<const uint8_t*>(buf), size);
     return;
   }
+#endif
 
   if (serial_master_) {
     serial_master_->write(buf, size);

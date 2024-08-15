@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.20)
+cmake_minimum_required(VERSION 3.25)
 
 project(vesccom)
 
@@ -13,9 +13,11 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 add_library(vesccom STATIC
     src/packet.cpp
-    src/socketcan_master.cpp
     src/vesc.cpp
 )
+if(LINUX)
+    target_sources(vesccom PRIVATE src/socketcan_master.cpp)
+endif()
 target_include_directories(vesccom
     PUBLIC
         include

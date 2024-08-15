@@ -10,7 +10,10 @@
 
 #include "boost/asio.hpp"
 #include "vesccom/packet.h"
+
+#ifdef __linux__
 #include "vesccom/socketcan_master.h"
+#endif
 
 namespace vesccom {
 
@@ -22,9 +25,11 @@ class vesc {
   // Constructs an instance representing a slave connected to a serial master.
   vesc(vesc& serial_master, uint8_t controller_id);
 
+#ifdef __linux__
   // Constructs an instance representing a slave connected to a SocketCAN
   // master.
   vesc(socketcan_master& can_master, uint8_t controller_id);
+#endif
 
   ~vesc();
 
@@ -32,7 +37,13 @@ class vesc {
   static void stop_keep_alive_thread();
   static void join_keep_alive_thread();
 
-  bool is_slave() { return can_master_ || serial_master_; }
+  bool is_slave() {
+#ifdef __linux__
+    return can_master_ || serial_master_;
+#else
+    return serial_master_;
+#endif
+  }
 
   // Receives a packet. Blocks until a complete packet is received.
   //
@@ -81,7 +92,9 @@ class vesc {
   inline static std::mutex keep_alive_state_mutex_;
 
   vesc* serial_master_ = nullptr;
+#ifdef __linux__
   socketcan_master* can_master_ = nullptr;
+#endif
 
   uint8_t controller_id_;
 
