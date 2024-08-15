@@ -19,5 +19,6 @@ Checks: >-
     -modernize-use-trailing-return-type,
     -performance-enum-size,
     -readability-braces-around-statements,
+    -readability-implicit-bool-conversion,
     -readability-magic-numbers
 HeaderFilterRegex: "vesccom/(include|src|test)/.*\\.h"
