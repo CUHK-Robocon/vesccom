@@ -8,6 +8,7 @@
 
 #include <cstring>
 #include <stdexcept>
+#include <utility>
 
 #include "bldc/datatypes.h"
 #include "boost/crc.hpp"
@@ -34,7 +35,18 @@ socketcan_master::socketcan_master(const char* device_name) {
     throw std::runtime_error("Failed to bind SocketCAN interface");
 }
 
-socketcan_master::~socketcan_master() { close(socket_); }
+socketcan_master::socketcan_master(socketcan_master&& other) {
+  std::swap(socket_, other.socket_);
+}
+
+socketcan_master::~socketcan_master() {
+  if (socket_ != -1) close(socket_);
+}
+
+socketcan_master& socketcan_master::operator=(socketcan_master&& other) {
+  std::swap(socket_, other.socket_);
+  return *this;
+}
 
 // Write data to the CAN Bus the socket is binded to.
 //
