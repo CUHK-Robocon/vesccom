@@ -8,7 +8,7 @@ namespace vesccom {
 
 class socketcan_master {
  public:
-  socketcan_master(const char* device_name);
+  explicit socketcan_master(const char* device_name);
   ~socketcan_master();
 
   void write(uint8_t controller_id, const uint8_t* data, size_t len);
