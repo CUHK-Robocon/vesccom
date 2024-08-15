@@ -1,0 +1,117 @@
+#include "vesccom/socketcan_master.h"
+
+#include <linux/can.h>
+#include <net/if.h>
+#include <sys/ioctl.h>
+#include <sys/socket.h>
+#include <unistd.h>
+
+#include <cstring>
+#include <stdexcept>
+
+#include "bldc/datatypes.h"
+#include "boost/crc.hpp"
+
+namespace vesccom {
+
+const uint8_t TO_SLAVE_COMMANDS_PROCESS_PACKET = 0;
+
+socketcan_master::socketcan_master(const char* device_name) {
+  socket_ = socket(PF_CAN, SOCK_RAW, CAN_RAW);
+  if (socket_ == -1)
+    throw std::runtime_error("Failed to open SocketCAN socket");
+
+  ifreq ifr;
+  std::strcpy(ifr.ifr_name, device_name);
+  if (ioctl(socket_, SIOCGIFINDEX, &ifr) == -1)
+    throw std::runtime_error("Failed to obtain SocketCAN interface index");
+
+  sockaddr_can addr;
+  addr.can_family = AF_CAN;
+  addr.can_ifindex = ifr.ifr_ifindex;
+
+  if (bind(socket_, reinterpret_cast<sockaddr*>(&addr), sizeof(addr)) == -1)
+    throw std::runtime_error("Failed to bind SocketCAN interface");
+}
+
+socketcan_master::~socketcan_master() { close(socket_); }
+
+// Write data to the CAN Bus the socket is binded to.
+//
+// Length check is NOT performed. Caller is responsible for ensuring `len <= 8`.
+void can_write(int socket, uint8_t controller_id, uint8_t packet_type,
+               const uint8_t* data, size_t len) {
+  can_frame frame;
+  frame.can_id = CAN_EFF_FLAG | controller_id & packet_type << 8;
+  frame.len = len;
+  std::memcpy(frame.data, data, len);
+
+  write(socket, &frame, sizeof(can_frame));
+}
+
+void socketcan_master::write(uint8_t controller_id, const uint8_t* data,
+                             size_t len) {
+  uint8_t send_buffer[8];
+
+  if (len <= 6) {
+    uint32_t ind = 0;
+
+    send_buffer[ind++] = controller_id;
+    send_buffer[ind++] = TO_SLAVE_COMMANDS_PROCESS_PACKET;
+
+    std::memcpy(send_buffer + ind, data, len);
+    ind += len;
+
+    can_write(socket_, controller_id, CAN_PACKET_PROCESS_SHORT_BUFFER,
+              send_buffer, ind);
+
+    return;
+  }
+
+  size_t i = 0;
+
+  for (; i < len; i += 7) {
+    if (i > 255) break;
+
+    size_t send_len = 7;
+
+    send_buffer[0] = i;
+
+    if (i + 7 > len) send_len = len - i;
+    std::memcpy(send_buffer + 1, data + i, send_len);
+
+    can_write(socket_, controller_id, CAN_PACKET_FILL_RX_BUFFER, send_buffer,
+              send_len + 1);
+  }
+
+  for (; i < len; i += 6) {
+    size_t send_len = 6;
+
+    send_buffer[0] = i >> 8;
+    send_buffer[1] = i & 0xFF;
+
+    if (i + 6 > len) send_len = len - i;
+    std::memcpy(send_buffer + 2, data + i, send_len);
+
+    can_write(socket_, controller_id, CAN_PACKET_FILL_RX_BUFFER_LONG,
+              send_buffer, send_len + 2);
+  }
+
+  uint32_t ind = 0;
+  send_buffer[ind++] = controller_id;
+  send_buffer[ind++] = TO_SLAVE_COMMANDS_PROCESS_PACKET;
+  send_buffer[ind++] = len >> 8;
+  send_buffer[ind++] = len & 0xFF;
+
+  boost::crc_xmodem_t crc;
+  crc.process_bytes(data, len);
+  uint16_t checksum = crc.checksum();
+
+  send_buffer[ind++] = checksum >> 8;
+  send_buffer[ind++] = checksum & 0xFF;
+
+  can_write(socket_, controller_id, CAN_PACKET_PROCESS_RX_BUFFER, send_buffer,
+            ind);
+}
+
+}  // namespace vesccom

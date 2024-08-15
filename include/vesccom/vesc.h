@@ -10,22 +10,29 @@
 
 #include "boost/asio.hpp"
 #include "vesccom/packet.h"
+#include "vesccom/socketcan_master.h"
 
 namespace vesccom {
 
 class vesc {
  public:
-  // Constructs an instance representing a master VESC.
+  // Constructs an instance representing a serial master.
   explicit vesc(const char* device_path, int baud_rate = 115200);
 
-  // Constructs an instance representing a slave VESC.
-  vesc(vesc& master, uint8_t controller_id);
+  // Constructs an instance representing a slave connected to a serial master.
+  vesc(vesc& serial_master, uint8_t controller_id);
+
+  // Constructs an instance representing a slave connected to a SocketCAN
+  // master.
+  vesc(socketcan_master& can_master, uint8_t controller_id);
 
   ~vesc();
 
   static void start_keep_alive_thread();
   static void stop_keep_alive_thread();
   static void join_keep_alive_thread();
+
+  bool is_slave() { return can_master_ || serial_master_; }
 
   // Receives a packet. Blocks until a complete packet is received.
   //
@@ -38,7 +45,10 @@ class vesc {
 
   // Sends `payload` while mutating the original vector.
   //
-  // Note that `payload` will be in-place modified.
+  // Note that `payload` will be in-place modified. It is also NOT guaranteed to
+  // be wrapped in a `COMM_FORWARD_CAN` packet, specifically when the master is
+  // a SocketCAN master. Therefore, DO NOT assume the content of the vector
+  // after calling this method.
   void send_payload_mut(std::vector<uint8_t>& payload);
 
   void send_payload(const uint8_t* data, size_t size);
@@ -60,8 +70,9 @@ class vesc {
   // Writes `buf` to master.
   //
   // Note that `buf` WILL NOT be wrapped in a `COMM_FORWARD_CAN` packet
-  // automatically. Thus, use with caution, make sure packets targetting a slave
-  // is not send to the master accidentally.
+  // automatically even when the master is a serial master. Thus, use with
+  // caution, make sure packets targetting a slave is not send to the master
+  // accidentally.
   void write(const void* buf, size_t size);
 
   inline static std::thread keep_alive_thread_;
@@ -69,7 +80,8 @@ class vesc {
   inline static std::unordered_set<vesc*> keep_alive_instances_;
   inline static std::mutex keep_alive_state_mutex_;
 
-  vesc* master_ = nullptr;
+  vesc* serial_master_ = nullptr;
+  socketcan_master* can_master_ = nullptr;
 
   uint8_t controller_id_;
 

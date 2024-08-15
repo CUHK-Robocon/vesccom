@@ -19,8 +19,21 @@ vesc::vesc(const char* device_path, int baud_rate)
   }
 }
 
-vesc::vesc(vesc& master, uint8_t controller_id)
-    : serial_(io_ctx_), master_(&master), controller_id_(controller_id) {
+vesc::vesc(vesc& serial_master, uint8_t controller_id)
+    : serial_(io_ctx_),
+      serial_master_(&serial_master),
+      controller_id_(controller_id) {
+  {
+    std::lock_guard<std::mutex> lock(keep_alive_state_mutex_);
+
+    keep_alive_instances_.insert(this);
+  }
+}
+
+vesc::vesc(socketcan_master& can_master, uint8_t controller_id)
+    : serial_(io_ctx_),
+      can_master_(&can_master),
+      controller_id_(controller_id) {
   {
     std::lock_guard<std::mutex> lock(keep_alive_state_mutex_);
 
@@ -49,7 +62,7 @@ void vesc::stop_keep_alive_thread() {
 void vesc::join_keep_alive_thread() { keep_alive_thread_.join(); }
 
 packet_parse_status vesc::receive_to(std::vector<uint8_t>& payload_out) {
-  if (master_)
+  if (is_slave())
     throw std::logic_error("Packet receiving for slaves is not supported");
 
   packet_parse_result result;
@@ -76,9 +89,11 @@ packet_parse_status vesc::receive_to(std::vector<uint8_t>& payload_out) {
 }
 
 void vesc::send_payload_mut(std::vector<uint8_t>& payload) {
-  if (master_) forward_can_wrap(controller_id_, payload);
+  if (!can_master_) {
+    if (serial_master_) forward_can_wrap(controller_id_, payload);
 
-  packet_wrap(payload);
+    packet_wrap(payload);
+  }
 
   write(payload.data(), payload.size());
 }
@@ -155,7 +170,7 @@ void vesc::keep_alive_thread_f() {
 }
 
 std::vector<uint8_t> vesc::read(size_t size) {
-  if (master_)
+  if (is_slave())
     throw std::logic_error(
         "Reading slave packets from master is not supported");
 
@@ -172,7 +187,12 @@ std::vector<uint8_t> vesc::read(size_t size) {
 }
 
 void vesc::write(const void* buf, size_t size) {
-  if (master_) return master_->write(buf, size);
+  if (can_master_) {
+    can_master_->write(controller_id_, static_cast<const uint8_t*>(buf), size);
+    return;
+  }
+
+  if (serial_master_) return serial_master_->write(buf, size);
 
   std::lock_guard<std::mutex> lock(serial_write_mutex_);
 
