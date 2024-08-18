@@ -16,6 +16,7 @@
 namespace vesccom {
 
 const uint8_t TO_SLAVE_COMMANDS_PROCESS_PACKET = 0;
+const uint8_t MASTER_CONTROLLER_ID = 0;
 
 socketcan_master::socketcan_master(const char* device_name) {
   socket_ = socket(PF_CAN, SOCK_RAW, CAN_RAW);
@@ -54,7 +55,7 @@ socketcan_master& socketcan_master::operator=(socketcan_master&& other) {
 void can_write(int socket, uint8_t controller_id, uint8_t packet_type,
                const uint8_t* data, size_t len) {
   can_frame frame;
-  frame.can_id = CAN_EFF_FLAG | controller_id & packet_type << 8;
+  frame.can_id = CAN_EFF_FLAG | controller_id | packet_type << 8;
   frame.len = len;
   std::memcpy(frame.data, data, len);
 
@@ -68,7 +69,7 @@ void socketcan_master::write(uint8_t controller_id, const uint8_t* data,
   if (len <= 6) {
     uint32_t ind = 0;
 
-    send_buffer[ind++] = controller_id;
+    send_buffer[ind++] = MASTER_CONTROLLER_ID;
     send_buffer[ind++] = TO_SLAVE_COMMANDS_PROCESS_PACKET;
 
     std::memcpy(send_buffer + ind, data, len);
@@ -110,7 +111,7 @@ void socketcan_master::write(uint8_t controller_id, const uint8_t* data,
   }
 
   uint32_t ind = 0;
-  send_buffer[ind++] = controller_id;
+  send_buffer[ind++] = MASTER_CONTROLLER_ID;
   send_buffer[ind++] = TO_SLAVE_COMMANDS_PROCESS_PACKET;
   send_buffer[ind++] = len >> 8;
   send_buffer[ind++] = len & 0xFF;
