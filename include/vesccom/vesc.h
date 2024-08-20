@@ -8,12 +8,19 @@
 #include <unordered_set>
 #include <vector>
 
-#include "boost/asio.hpp"
 #include "vesccom/packet.h"
 
 #ifdef __linux__
 #include "vesccom/socketcan_master.h"
 #endif
+
+// Before Boost.Asio 1.79.0, "boost/asio/awaitable.hpp" does not include
+// <utility> causing `std::exchange` to be missing. Fixed by commit
+// 71964b22c7fade69cc4caa1c869a868e3a32cc97. Backported to here.
+// clang-format off
+#include <utility>
+#include "boost/asio.hpp"
+// clang-format on
 
 namespace vesccom {
 
