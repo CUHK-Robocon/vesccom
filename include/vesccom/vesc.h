@@ -1,5 +1,5 @@
-#ifndef VESCCOM_VESC_H_
-#define VESCCOM_VESC_H_
+#ifndef VESCCOM_INCLUDE_VESCCOM_VESC_H_
+#define VESCCOM_INCLUDE_VESCCOM_VESC_H_
 
 #include <cstddef>
 #include <cstdint>
