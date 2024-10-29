@@ -36,7 +36,7 @@ socketcan_master::socketcan_master(const char* device_name) {
     throw std::runtime_error("Failed to bind SocketCAN interface");
 }
 
-socketcan_master::socketcan_master(socketcan_master&& other) {
+socketcan_master::socketcan_master(socketcan_master&& other) noexcept {
   std::swap(socket_, other.socket_);
 }
 
@@ -44,7 +44,8 @@ socketcan_master::~socketcan_master() {
   if (socket_ != -1) close(socket_);
 }
 
-socketcan_master& socketcan_master::operator=(socketcan_master&& other) {
+socketcan_master& socketcan_master::operator=(
+    socketcan_master&& other) noexcept {
   std::swap(socket_, other.socket_);
   return *this;
 }
