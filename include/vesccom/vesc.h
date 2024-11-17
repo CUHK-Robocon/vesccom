@@ -87,6 +87,7 @@ class vesc {
   void set_erpm(int erpm);
   void set_current(double current);
   void set_pos(double pos);
+  void set_pos_full(float pos);
 
  private:
   static void keep_alive_thread_f();

@@ -160,6 +160,17 @@ void vesc::set_pos(double pos) {
   send_payload_mut(buf);
 }
 
+void vesc::set_pos_full(float pos) {
+  std::vector<uint8_t> buf;
+
+  buf.push_back(COMM_SET_POS_FULL);
+
+  boost::endian::big_float32_buf_t pos_buf(pos);
+  buf.insert(buf.end(), pos_buf.data(), pos_buf.data() + sizeof(float));
+
+  send_payload_mut(buf);
+}
+
 void vesc::keep_alive_thread_f() {
   while (true) {
     {

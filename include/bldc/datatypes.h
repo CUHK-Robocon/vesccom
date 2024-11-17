@@ -22,6 +22,7 @@
 // Changelog
 // 1. Removed "ch.h" include and extract `systime_t` definition.
 // 2. Add `extern "C"` for C++.
+// 3. Add `COMM_SET_POS_FULL = 255` for full range PID position control.
 
 #ifndef DATATYPES_H_
 #define DATATYPES_H_
@@ -1110,6 +1111,8 @@ typedef enum {
 	//COMM_PINLOCK3							= 155,
 
 	COMM_SHUTDOWN							= 156,
+
+	COMM_SET_POS_FULL						= 255,
 } COMM_PACKET_ID;
 
 // CAN commands
