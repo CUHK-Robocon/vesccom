@@ -1,4 +1,4 @@
-#include "vesccom/socketcan_master.h"
+#include "vesccom/socketcan.h"
 
 #include <linux/can.h>
 #include <net/if.h>

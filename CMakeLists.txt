@@ -16,7 +16,7 @@ add_library(vesccom STATIC
     src/vesc.cpp
 )
 if(LINUX)
-    target_sources(vesccom PRIVATE src/socketcan_master.cpp)
+    target_sources(vesccom PRIVATE src/socketcan.cpp)
 endif()
 target_include_directories(vesccom
     PUBLIC

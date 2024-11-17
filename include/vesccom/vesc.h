@@ -11,7 +11,7 @@
 #include "vesccom/packet.h"
 
 #ifdef __linux__
-#include "vesccom/socketcan_master.h"
+#include "vesccom/socketcan.h"
 #endif
 
 // Before Boost.Asio 1.79.0, "boost/asio/awaitable.hpp" does not include
