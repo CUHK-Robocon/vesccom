@@ -14,7 +14,6 @@ vesc::vesc(const char* device_path, int baud_rate)
 
   {
     std::lock_guard<std::mutex> lock(keep_alive_state_mutex_);
-
     keep_alive_instances_.insert(this);
   }
 }
@@ -25,15 +24,15 @@ vesc::vesc(socketcan_master& can_master, uint8_t controller_id)
       controller_id_(controller_id) {
   {
     std::lock_guard<std::mutex> lock(keep_alive_state_mutex_);
-
     keep_alive_instances_.insert(this);
   }
 }
 
 vesc::~vesc() {
-  std::lock_guard<std::mutex> lock(keep_alive_state_mutex_);
-
-  keep_alive_instances_.erase(this);
+  {
+    std::lock_guard<std::mutex> lock(keep_alive_state_mutex_);
+    keep_alive_instances_.erase(this);
+  }
 }
 
 void vesc::start_keep_alive_thread() {
@@ -43,9 +42,10 @@ void vesc::start_keep_alive_thread() {
 }
 
 void vesc::stop_keep_alive_thread() {
-  std::lock_guard<std::mutex> lock(keep_alive_state_mutex_);
-
-  keep_alive_thread_should_stop_ = true;
+  {
+    std::lock_guard<std::mutex> lock(keep_alive_state_mutex_);
+    keep_alive_thread_should_stop_ = true;
+  }
 }
 
 void vesc::join_keep_alive_thread() { keep_alive_thread_.join(); }
@@ -84,7 +84,6 @@ void vesc::send_payload_mut(std::vector<uint8_t>& payload) {
 
 void vesc::send_payload(const uint8_t* data, size_t size) {
   std::vector<uint8_t> buf;
-
   buf.insert(buf.end(), data, data + size);
 
   send_payload_mut(buf);
@@ -163,7 +162,6 @@ std::vector<uint8_t> vesc::read(size_t size) {
 
   {
     std::lock_guard<std::mutex> lock(serial_read_mutex_);
-
     boost::asio::read(serial_, boost::asio::buffer(buf.data(), size));
   }
 
@@ -176,9 +174,10 @@ void vesc::write(const void* buf, size_t size) {
     return;
   }
 
-  std::lock_guard<std::mutex> lock(serial_write_mutex_);
-
-  boost::asio::write(serial_, boost::asio::buffer(buf, size));
+  {
+    std::lock_guard<std::mutex> lock(serial_write_mutex_);
+    boost::asio::write(serial_, boost::asio::buffer(buf, size));
+  }
 }
 
 }  // namespace vesccom
