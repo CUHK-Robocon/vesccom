@@ -1,7 +1,9 @@
 #include "vesccom/socketcan.h"
 
-#include <linux/can.h>
+#include <errno.h>
 #include <net/if.h>
+#include <poll.h>
+#include <sys/eventfd.h>
 #include <sys/ioctl.h>
 #include <sys/socket.h>
 #include <unistd.h>
@@ -12,42 +14,52 @@
 
 #include "bldc/datatypes.h"
 #include "boost/crc.hpp"
+#include "vesccom/buf.h"
 
 namespace vesccom {
 
 const uint8_t TO_SLAVE_COMMANDS_PROCESS_PACKET = 0;
 const uint8_t MASTER_CONTROLLER_ID = 0;
 
-socketcan_master::socketcan_master(const char* device_name) {
+socketcan_master::socketcan_master(
+    const char* device_name,
+    sync::completion_notifier* pid_pos_full_now_all_ready_notifier) {
   socket_ = socket(PF_CAN, SOCK_RAW, CAN_RAW);
   if (socket_ == -1)
     throw std::runtime_error("Failed to open SocketCAN socket");
 
   ifreq ifr;
   std::strcpy(ifr.ifr_name, device_name);
-  if (ioctl(socket_, SIOCGIFINDEX, &ifr) == -1)
+  if (ioctl(socket_, SIOCGIFINDEX, &ifr) == -1) {
+    close(socket_);
+
     throw std::runtime_error("Failed to obtain SocketCAN interface index");
+  }
 
   sockaddr_can addr;
   addr.can_family = AF_CAN;
   addr.can_ifindex = ifr.ifr_ifindex;
 
-  if (bind(socket_, reinterpret_cast<sockaddr*>(&addr), sizeof(addr)) == -1)
-    throw std::runtime_error("Failed to bind SocketCAN interface");
-}
+  if (bind(socket_, reinterpret_cast<sockaddr*>(&addr), sizeof(addr)) == -1) {
+    close(socket_);
 
-socketcan_master::socketcan_master(socketcan_master&& other) noexcept {
-  std::swap(socket_, other.socket_);
+    throw std::runtime_error("Failed to bind SocketCAN interface");
+  }
+
+  monitor_stop_efd_ = eventfd(0, EFD_NONBLOCK);
+  if (monitor_stop_efd_ == -1) {
+    close(socket_);
+
+    throw std::runtime_error(
+        "Failed to create eventfd for stopping CAN Bus monitoring");
+  }
+
+  pid_pos_full_now_all_ready_notifier_ = pid_pos_full_now_all_ready_notifier;
 }
 
 socketcan_master::~socketcan_master() {
-  if (socket_ != -1) close(socket_);
-}
-
-socketcan_master& socketcan_master::operator=(
-    socketcan_master&& other) noexcept {
-  std::swap(socket_, other.socket_);
-  return *this;
+  close(socket_);
+  close(monitor_stop_efd_);
 }
 
 // Write data to the CAN Bus the socket is binded to.
@@ -126,6 +138,122 @@ void socketcan_master::write(uint8_t controller_id, const uint8_t* data,
 
   can_write(socket_, controller_id, CAN_PACKET_PROCESS_RX_BUFFER, send_buffer,
             ind);
+}
+
+void socketcan_master::register_slave(uint8_t controller_id) {
+  slaves_status_[controller_id] = {};
+}
+
+void socketcan_master::start_monitor_thread() {
+  reset_monitor_stop_efd();
+  monitor_thread_ = std::thread(&socketcan_master::monitor_thread_f, this);
+}
+
+void socketcan_master::stop_monitor_thread() {
+  uint64_t MONITOR_STOP_EFD_INC_VAL = 1;
+  if (::write(monitor_stop_efd_, &MONITOR_STOP_EFD_INC_VAL, sizeof(uint64_t)) ==
+      -1) {
+    if (errno == EAGAIN) {
+      throw std::logic_error(
+          "Monitor stop eventfd counter is about to overflow, perhaps the "
+          "program is trying to stop the monitor thread repeatedly");
+    } else {
+      throw std::runtime_error("Failed to write to monitor stop eventfd");
+    }
+  }
+}
+
+void socketcan_master::join_monitor_thread() { monitor_thread_.join(); }
+
+void socketcan_master::reset_monitor_stop_efd() {
+  uint64_t tmp;
+  // We only need to handle non-EAGAIN errors. As we are resetting monitor stop
+  // eventfd to zero, it is okay for the counter to be zero when we read it.
+  if (read(monitor_stop_efd_, &tmp, sizeof(uint64_t)) == -1 &&
+      errno != EAGAIN) {
+    throw std::runtime_error("Failed to read monitor stop eventfd");
+  }
+}
+
+void socketcan_master::process_can_frame(can_frame frame) {
+  std::lock_guard<std::mutex> lock(slaves_status_mutex_);
+
+  uint8_t id = frame.can_id & 0xFF;
+  if (!slaves_status_.contains(id)) return;
+
+  uint8_t cmd = frame.can_id >> 8;
+  if (cmd != CAN_PACKET_STATUS && cmd != CAN_PACKET_STATUS_4 &&
+      cmd != CAN_PACKET_STATUS_5) {
+    return;
+  }
+
+  socketcan_status& status = slaves_status_[id];
+  int ind = 0;
+
+  switch (cmd) {
+    case CAN_PACKET_STATUS:
+      status.status_1.ready = true;
+      status.status_1.rpm = buf::get_int32_be(frame.data, ind);
+      status.status_1.current = buf::get_int16_be(frame.data, ind) / 10.0;
+      status.status_1.duty = buf::get_int16_be(frame.data, ind) / 1000.0;
+      break;
+
+    case CAN_PACKET_STATUS_4:
+      status.status_4.ready = true;
+      status.status_4.temp_fet = buf::get_int16_be(frame.data, ind) / 10.0;
+      status.status_4.temp_motor = buf::get_int16_be(frame.data, ind) / 10.0;
+      status.status_4.current_in = buf::get_int16_be(frame.data, ind) / 10.0;
+      status.status_4.pid_pos_now = buf::get_int16_be(frame.data, ind) / 50.0;
+      break;
+
+    case CAN_PACKET_STATUS_5:
+      status.status_5.ready = true;
+      status.status_5.pid_pos_full_now = buf::get_float32_be(frame.data, ind);
+      status.status_5.v_in = buf::get_int16_be(frame.data, ind) / 10.0;
+
+      if (++pid_pos_full_ready_count_ == slaves_status_.size())
+        pid_pos_full_now_all_ready_notifier_->notify();
+
+      break;
+
+    default:
+      return;
+  }
+}
+
+void socketcan_master::monitor_thread_f() {
+  pollfd pfds[2];
+
+  pollfd& can_pfd = pfds[0] = {
+      .fd = socket_,
+      .events = POLLIN,
+  };
+  pollfd& monitor_stop_pfd = pfds[1] = {
+      .fd = monitor_stop_efd_,
+      .events = POLLIN,
+  };
+
+  while (true) {
+    if (poll(pfds, 2, -1) == -1) {
+      throw std::runtime_error(
+          "Failed to poll SocketCAN and monitor stop eventfd");
+    }
+
+    // Stop monitoring immediately when monitor stop eventfd receives an event.
+    // `can_frame`s still in the CAN Bus socket are not processed.
+    if (monitor_stop_pfd.revents & POLLIN) break;
+
+    // Timeout is set to -1, poll will block infinitely. If monitor stop eventfd
+    // is not ready, it must be that CAN Bus socket is ready here. Therefore, we
+    // does not need to perform another check.
+
+    can_frame frame;
+    while (recv(socket_, &frame, sizeof(can_frame), MSG_DONTWAIT) != -1)
+      process_can_frame(frame);
+
+    if (errno != EAGAIN && errno != EWOULDBLOCK)
+      throw std::runtime_error("Failed to read from CAN Bus socket");
+  }
 }
 
 }  // namespace vesccom

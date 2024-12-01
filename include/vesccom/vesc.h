@@ -32,17 +32,9 @@ class vesc {
 
   vesc(const vesc&) = delete;
 
-  // Until `io_ctx_` is a reference passed into the class through constructor,
-  // the class should stay unmovable.
-  vesc(vesc&& other) = delete;
-
   ~vesc();
 
   vesc& operator=(const vesc&) = delete;
-
-  // Until `io_ctx_` is a reference passed into the class through constructor,
-  // the class should stay being not move-assignable.
-  vesc& operator=(vesc&&) = delete;
 
   static void start_keep_alive_thread();
   static void stop_keep_alive_thread();

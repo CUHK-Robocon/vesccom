@@ -26,6 +26,8 @@ vesc::vesc(socketcan_master& can_master, uint8_t controller_id)
     std::lock_guard<std::mutex> lock(keep_alive_state_mutex_);
     keep_alive_instances_.insert(this);
   }
+
+  can_master.register_slave(controller_id);
 }
 
 vesc::~vesc() {
