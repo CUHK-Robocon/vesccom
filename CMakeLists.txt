@@ -13,11 +13,9 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 add_library(vesccom STATIC
     src/packet.cpp
+    src/socketcan.cpp
     src/vesc.cpp
 )
-if(LINUX)
-    target_sources(vesccom PRIVATE src/socketcan.cpp)
-endif()
 target_include_directories(vesccom
     PUBLIC
         include
