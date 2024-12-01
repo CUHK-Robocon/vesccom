@@ -26,9 +26,6 @@ class vesc {
   // Constructs an instance representing a serial master.
   explicit vesc(const char* device_path, int baud_rate = 115200);
 
-  // Constructs an instance representing a slave connected to a serial master.
-  vesc(vesc& serial_master, uint8_t controller_id);
-
   // Constructs an instance representing a slave connected to a SocketCAN
   // master.
   vesc(socketcan_master& can_master, uint8_t controller_id);
@@ -51,7 +48,7 @@ class vesc {
   static void stop_keep_alive_thread();
   static void join_keep_alive_thread();
 
-  bool is_slave() { return can_master_ || serial_master_; }
+  bool is_slave() { return can_master_; }
 
   // Receives a packet. Blocks until a complete packet is received.
   //
@@ -99,9 +96,7 @@ class vesc {
   inline static std::unordered_set<vesc*> keep_alive_instances_;
   inline static std::mutex keep_alive_state_mutex_;
 
-  vesc* serial_master_ = nullptr;
   socketcan_master* can_master_ = nullptr;
-
   uint8_t controller_id_;
 
   // Must be declared before `serial_` for the correct initialization order.
