@@ -6,7 +6,7 @@
 
 - CMake
 - A CMake generator e.g. Make, Ninja
-- C++17 compiler
+- C++20 compiler
 - Boost
 
 ## Build
