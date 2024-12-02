@@ -9,10 +9,7 @@
 #include <vector>
 
 #include "vesccom/packet.h"
-
-#ifdef __linux__
 #include "vesccom/socketcan.h"
-#endif
 
 // Before Boost.Asio 1.79.0, "boost/asio/awaitable.hpp" does not include
 // <utility> causing `std::exchange` to be missing. Fixed by commit
@@ -29,40 +26,21 @@ class vesc {
   // Constructs an instance representing a serial master.
   explicit vesc(const char* device_path, int baud_rate = 115200);
 
-  // Constructs an instance representing a slave connected to a serial master.
-  vesc(vesc& serial_master, uint8_t controller_id);
-
-#ifdef __linux__
   // Constructs an instance representing a slave connected to a SocketCAN
   // master.
   vesc(socketcan_master& can_master, uint8_t controller_id);
-#endif
 
   vesc(const vesc&) = delete;
-
-  // Until `io_ctx_` is a reference passed into the class through constructor,
-  // the class should stay unmovable.
-  vesc(vesc&& other) = delete;
 
   ~vesc();
 
   vesc& operator=(const vesc&) = delete;
 
-  // Until `io_ctx_` is a reference passed into the class through constructor,
-  // the class should stay being not move-assignable.
-  vesc& operator=(vesc&&) = delete;
-
   static void start_keep_alive_thread();
   static void stop_keep_alive_thread();
   static void join_keep_alive_thread();
 
-  bool is_slave() {
-#ifdef __linux__
-    return can_master_ || serial_master_;
-#else
-    return serial_master_;
-#endif
-  }
+  bool is_slave() { return can_master_; }
 
   // Receives a packet. Blocks until a complete packet is received.
   //
@@ -89,6 +67,8 @@ class vesc {
   void set_pos(double pos);
   void set_pos_full(float pos);
 
+  float get_pid_pos_full();
+
  private:
   static void keep_alive_thread_f();
 
@@ -106,16 +86,14 @@ class vesc {
   // accidentally.
   void write(const void* buf, size_t size);
 
+  socketcan_status get_status();
+
   inline static std::thread keep_alive_thread_;
   inline static bool keep_alive_thread_should_stop_ = false;
   inline static std::unordered_set<vesc*> keep_alive_instances_;
   inline static std::mutex keep_alive_state_mutex_;
 
-  vesc* serial_master_ = nullptr;
-#ifdef __linux__
   socketcan_master* can_master_ = nullptr;
-#endif
-
   uint8_t controller_id_;
 
   // Must be declared before `serial_` for the correct initialization order.

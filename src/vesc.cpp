@@ -14,39 +14,27 @@ vesc::vesc(const char* device_path, int baud_rate)
 
   {
     std::lock_guard<std::mutex> lock(keep_alive_state_mutex_);
-
     keep_alive_instances_.insert(this);
   }
 }
 
-vesc::vesc(vesc& serial_master, uint8_t controller_id)
-    : serial_(io_ctx_),
-      serial_master_(&serial_master),
-      controller_id_(controller_id) {
-  {
-    std::lock_guard<std::mutex> lock(keep_alive_state_mutex_);
-
-    keep_alive_instances_.insert(this);
-  }
-}
-
-#ifdef __linux__
 vesc::vesc(socketcan_master& can_master, uint8_t controller_id)
     : serial_(io_ctx_),
       can_master_(&can_master),
       controller_id_(controller_id) {
   {
     std::lock_guard<std::mutex> lock(keep_alive_state_mutex_);
-
     keep_alive_instances_.insert(this);
   }
+
+  can_master.register_slave(controller_id);
 }
-#endif
 
 vesc::~vesc() {
-  std::lock_guard<std::mutex> lock(keep_alive_state_mutex_);
-
-  keep_alive_instances_.erase(this);
+  {
+    std::lock_guard<std::mutex> lock(keep_alive_state_mutex_);
+    keep_alive_instances_.erase(this);
+  }
 }
 
 void vesc::start_keep_alive_thread() {
@@ -56,9 +44,10 @@ void vesc::start_keep_alive_thread() {
 }
 
 void vesc::stop_keep_alive_thread() {
-  std::lock_guard<std::mutex> lock(keep_alive_state_mutex_);
-
-  keep_alive_thread_should_stop_ = true;
+  {
+    std::lock_guard<std::mutex> lock(keep_alive_state_mutex_);
+    keep_alive_thread_should_stop_ = true;
+  }
 }
 
 void vesc::join_keep_alive_thread() { keep_alive_thread_.join(); }
@@ -91,24 +80,12 @@ packet_parse_status vesc::receive_to(std::vector<uint8_t>& payload_out) {
 }
 
 void vesc::send_payload_mut(std::vector<uint8_t>& payload) {
-#ifdef __linux__
-  if (!can_master_) {
-#endif
-
-    if (serial_master_) forward_can_wrap(controller_id_, payload);
-
-    packet_wrap(payload);
-
-#ifdef __linux__
-  }
-#endif
-
+  if (!is_slave()) packet_wrap(payload);
   write(payload.data(), payload.size());
 }
 
 void vesc::send_payload(const uint8_t* data, size_t size) {
   std::vector<uint8_t> buf;
-
   buf.insert(buf.end(), data, data + size);
 
   send_payload_mut(buf);
@@ -171,6 +148,15 @@ void vesc::set_pos_full(float pos) {
   send_payload_mut(buf);
 }
 
+float vesc::get_pid_pos_full() {
+  if (!is_slave())
+    throw std::logic_error("Getter not implemented for serial VESCs yet");
+
+  socketcan_status slave_status = get_status();
+  if (!slave_status.status_5.ready) return NAN;
+  return slave_status.status_5.pid_pos_full_now;
+}
+
 void vesc::keep_alive_thread_f() {
   while (true) {
     {
@@ -198,7 +184,6 @@ std::vector<uint8_t> vesc::read(size_t size) {
 
   {
     std::lock_guard<std::mutex> lock(serial_read_mutex_);
-
     boost::asio::read(serial_, boost::asio::buffer(buf.data(), size));
   }
 
@@ -206,21 +191,24 @@ std::vector<uint8_t> vesc::read(size_t size) {
 }
 
 void vesc::write(const void* buf, size_t size) {
-#ifdef __linux__
-  if (can_master_) {
+  if (is_slave()) {
     can_master_->write(controller_id_, static_cast<const uint8_t*>(buf), size);
     return;
   }
-#endif
 
-  if (serial_master_) {
-    serial_master_->write(buf, size);
-    return;
+  {
+    std::lock_guard<std::mutex> lock(serial_write_mutex_);
+    boost::asio::write(serial_, boost::asio::buffer(buf, size));
   }
+}
 
-  std::lock_guard<std::mutex> lock(serial_write_mutex_);
-
-  boost::asio::write(serial_, boost::asio::buffer(buf, size));
+socketcan_status vesc::get_status() {
+  auto slave_status_opt = can_master_->get_slave_status(controller_id_);
+  if (!slave_status_opt.has_value()) {
+    throw std::logic_error(
+        "Slave status not found, maybe the slave have not been registered");
+  }
+  return slave_status_opt.value();
 }
 
 }  // namespace vesccom

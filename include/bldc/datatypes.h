@@ -23,6 +23,7 @@
 // 1. Removed "ch.h" include and extract `systime_t` definition.
 // 2. Add `extern "C"` for C++.
 // 3. Add `COMM_SET_POS_FULL = 255` for full range PID position control.
+// 4. Replace tachometer value with full range PID position in CAN status message 5.
 
 #ifndef DATATYPES_H_
 #define DATATYPES_H_
@@ -1266,7 +1267,7 @@ typedef struct {
 	int id;
 	systime_t rx_time;
 	float v_in;
-	int32_t tacho_value;
+	float pid_pos_full_now;
 } can_status_msg_5;
 
 typedef struct {
