@@ -54,7 +54,6 @@ class socketcan_master {
   // Must be called before starting monitor thread.
   void register_slave(uint8_t controller_id);
 
-  bool is_pid_pos_full_now_all_ready();
   void wait_pid_pos_full_now_all_ready();
 
   void start_monitor_thread();
@@ -65,6 +64,7 @@ class socketcan_master {
   // Resets monitor stop eventfd counter to zero.
   void reset_monitor_stop_efd();
 
+  bool is_pid_pos_full_now_all_ready_unlocked();
   void process_can_frame(can_frame frame);
 
   void monitor_thread_f();

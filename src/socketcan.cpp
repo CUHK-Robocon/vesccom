@@ -140,12 +140,6 @@ void socketcan_master::register_slave(uint8_t controller_id) {
   slaves_status_[controller_id] = {};
 }
 
-bool socketcan_master::is_pid_pos_full_now_all_ready() {
-  for (const auto& [id, status] : slaves_status_)
-    if (!status.status_5.ready) return false;
-  return true;
-}
-
 void socketcan_master::wait_pid_pos_full_now_all_ready() {
   pid_pos_full_now_all_ready_notifier_.wait();
 }
@@ -179,6 +173,12 @@ void socketcan_master::reset_monitor_stop_efd() {
       errno != EAGAIN) {
     throw std::runtime_error("Failed to read monitor stop eventfd");
   }
+}
+
+bool socketcan_master::is_pid_pos_full_now_all_ready_unlocked() {
+  for (const auto& [id, status] : slaves_status_)
+    if (!status.status_5.ready) return false;
+  return true;
 }
 
 void socketcan_master::process_can_frame(can_frame frame) {
@@ -217,7 +217,7 @@ void socketcan_master::process_can_frame(can_frame frame) {
       status.status_5.pid_pos_full_now = buf::get_float32_be(frame.data, ind);
       status.status_5.v_in = buf::get_int16_be(frame.data, ind) / 10.0;
 
-      if (is_pid_pos_full_now_all_ready())
+      if (is_pid_pos_full_now_all_ready_unlocked())
         pid_pos_full_now_all_ready_notifier_.notify();
 
       break;
