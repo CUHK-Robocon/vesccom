@@ -6,6 +6,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <mutex>
+#include <optional>
 #include <thread>
 #include <unordered_map>
 
@@ -53,6 +54,7 @@ class socketcan_master {
 
   // Must be called before starting monitor thread.
   void register_slave(uint8_t controller_id);
+  std::optional<socketcan_status> get_slave_status(uint8_t controller_id);
 
   void wait_pid_pos_full_now_all_ready();
 

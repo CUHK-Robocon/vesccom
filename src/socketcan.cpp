@@ -140,6 +140,16 @@ void socketcan_master::register_slave(uint8_t controller_id) {
   slaves_status_[controller_id] = {};
 }
 
+std::optional<socketcan_status> socketcan_master::get_slave_status(
+    uint8_t controller_id) {
+  try {
+    std::lock_guard<std::mutex> lock(slaves_status_mutex_);
+    return slaves_status_.at(controller_id);
+  } catch (std::out_of_range) {
+    return std::nullopt;
+  }
+}
+
 void socketcan_master::wait_pid_pos_full_now_all_ready() {
   pid_pos_full_now_all_ready_notifier_.wait();
 }

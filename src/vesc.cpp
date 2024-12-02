@@ -137,6 +137,15 @@ void vesc::set_pos(double pos) {
   send_payload_mut(buf);
 }
 
+float vesc::get_pid_pos_full() {
+  if (!is_slave())
+    throw std::logic_error("Getter not implemented for serial VESCs yet");
+
+  socketcan_status slave_status = get_status();
+  if (!slave_status.status_5.ready) return NAN;
+  return slave_status.status_5.pid_pos_full_now;
+}
+
 void vesc::keep_alive_thread_f() {
   while (true) {
     {
@@ -180,6 +189,15 @@ void vesc::write(const void* buf, size_t size) {
     std::lock_guard<std::mutex> lock(serial_write_mutex_);
     boost::asio::write(serial_, boost::asio::buffer(buf, size));
   }
+}
+
+socketcan_status vesc::get_status() {
+  auto slave_status_opt = can_master_->get_slave_status(controller_id_);
+  if (!slave_status_opt.has_value()) {
+    throw std::logic_error(
+        "Slave status not found, maybe the slave have not been registered");
+  }
+  return slave_status_opt.value();
 }
 
 }  // namespace vesccom

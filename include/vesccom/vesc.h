@@ -66,6 +66,8 @@ class vesc {
   void set_current(double current);
   void set_pos(double pos);
 
+  float get_pid_pos_full();
+
  private:
   static void keep_alive_thread_f();
 
@@ -82,6 +84,8 @@ class vesc {
   // caution, make sure packets targetting a slave is not send to the master
   // accidentally.
   void write(const void* buf, size_t size);
+
+  socketcan_status get_status();
 
   inline static std::thread keep_alive_thread_;
   inline static bool keep_alive_thread_should_stop_ = false;
