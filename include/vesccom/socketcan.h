@@ -41,9 +41,7 @@ struct socketcan_status {
 
 class socketcan_master {
  public:
-  socketcan_master(
-      const char* device_name,
-      sync::completion_notifier* pid_pos_full_now_all_ready_notifier = nullptr);
+  socketcan_master(const char* device_name);
 
   socketcan_master(const socketcan_master&) = delete;
 
@@ -55,6 +53,8 @@ class socketcan_master {
 
   // Must be called before starting monitor thread.
   void register_slave(uint8_t controller_id);
+
+  void wait_pid_pos_full_now_all_ready();
 
   void start_monitor_thread();
   void stop_monitor_thread();
@@ -75,7 +75,7 @@ class socketcan_master {
   std::unordered_map<uint8_t, socketcan_status> slaves_status_;
   std::mutex slaves_status_mutex_;
 
-  sync::completion_notifier* pid_pos_full_now_all_ready_notifier_;
+  sync::completion_notifier pid_pos_full_now_all_ready_notifier_;
   int pid_pos_full_ready_count_ = 0;
 };
 

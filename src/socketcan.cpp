@@ -21,9 +21,7 @@ namespace vesccom {
 const uint8_t TO_SLAVE_COMMANDS_PROCESS_PACKET = 0;
 const uint8_t MASTER_CONTROLLER_ID = 0;
 
-socketcan_master::socketcan_master(
-    const char* device_name,
-    sync::completion_notifier* pid_pos_full_now_all_ready_notifier) {
+socketcan_master::socketcan_master(const char* device_name) {
   socket_ = socket(PF_CAN, SOCK_RAW, CAN_RAW);
   if (socket_ == -1)
     throw std::runtime_error("Failed to open SocketCAN socket");
@@ -53,8 +51,6 @@ socketcan_master::socketcan_master(
     throw std::runtime_error(
         "Failed to create eventfd for stopping CAN Bus monitoring");
   }
-
-  pid_pos_full_now_all_ready_notifier_ = pid_pos_full_now_all_ready_notifier;
 }
 
 socketcan_master::~socketcan_master() {
@@ -144,6 +140,10 @@ void socketcan_master::register_slave(uint8_t controller_id) {
   slaves_status_[controller_id] = {};
 }
 
+void socketcan_master::wait_pid_pos_full_now_all_ready() {
+  pid_pos_full_now_all_ready_notifier_.wait();
+}
+
 void socketcan_master::start_monitor_thread() {
   reset_monitor_stop_efd();
   monitor_thread_ = std::thread(&socketcan_master::monitor_thread_f, this);
@@ -212,7 +212,7 @@ void socketcan_master::process_can_frame(can_frame frame) {
       status.status_5.v_in = buf::get_int16_be(frame.data, ind) / 10.0;
 
       if (++pid_pos_full_ready_count_ == slaves_status_.size())
-        pid_pos_full_now_all_ready_notifier_->notify();
+        pid_pos_full_now_all_ready_notifier_.notify();
 
       break;
 
