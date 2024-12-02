@@ -140,6 +140,12 @@ void socketcan_master::register_slave(uint8_t controller_id) {
   slaves_status_[controller_id] = {};
 }
 
+bool socketcan_master::is_pid_pos_full_now_all_ready() {
+  for (const auto& [id, status] : slaves_status_)
+    if (!status.status_5.ready) return false;
+  return true;
+}
+
 void socketcan_master::wait_pid_pos_full_now_all_ready() {
   pid_pos_full_now_all_ready_notifier_.wait();
 }
@@ -211,7 +217,7 @@ void socketcan_master::process_can_frame(can_frame frame) {
       status.status_5.pid_pos_full_now = buf::get_float32_be(frame.data, ind);
       status.status_5.v_in = buf::get_int16_be(frame.data, ind) / 10.0;
 
-      if (++pid_pos_full_ready_count_ == slaves_status_.size())
+      if (is_pid_pos_full_now_all_ready())
         pid_pos_full_now_all_ready_notifier_.notify();
 
       break;

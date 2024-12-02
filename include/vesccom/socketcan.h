@@ -54,6 +54,7 @@ class socketcan_master {
   // Must be called before starting monitor thread.
   void register_slave(uint8_t controller_id);
 
+  bool is_pid_pos_full_now_all_ready();
   void wait_pid_pos_full_now_all_ready();
 
   void start_monitor_thread();
@@ -76,7 +77,6 @@ class socketcan_master {
   std::mutex slaves_status_mutex_;
 
   sync::completion_notifier pid_pos_full_now_all_ready_notifier_;
-  int pid_pos_full_ready_count_ = 0;
 };
 
 }  // namespace vesccom
