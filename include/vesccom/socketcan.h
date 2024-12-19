@@ -50,10 +50,20 @@ class socketcan_master {
 
   void write(uint8_t controller_id, const uint8_t* data, size_t len);
 
-  // Must be called before starting monitor thread.
+  // Allocates state resources for the slave.
+  //
+  // This method is for VESC instances to late-initialize. Therefore, the method
+  // SHOULD NOT be called directly.
+  //
+  // All slaves MUST be registered before starting the monitor thread.
   void register_slave(uint8_t controller_id);
+
+  // Returns the status of the corresponding slave.
+  //
+  // Throws `std::logic_error` if the slave is not registered.
   socketcan_status get_slave_status(uint8_t controller_id);
 
+  // Blocks until full range PID position is ready.
   void wait_pid_pos_full_now_all_ready();
 
   void start_monitor_thread();

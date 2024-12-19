@@ -94,7 +94,8 @@ class vesc {
   // accidentally.
   void write(const void* buf, size_t size);
 
-  socketcan_status get_status();
+  // Note that the object is NOT checked if it represents a slave.
+  socketcan_status get_status_unchecked();
 
   inline static std::thread keep_alive_thread_;
   inline static bool keep_alive_thread_should_stop_ = false;
