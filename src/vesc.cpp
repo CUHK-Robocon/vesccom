@@ -153,7 +153,8 @@ float vesc::get_pid_pos_full() {
     throw std::logic_error("Getter not implemented for serial VESCs yet");
 
   socketcan_status slave_status = get_status();
-  if (!slave_status.status_5.ready) return NAN;
+  if (!slave_status.status_5.ready)
+    throw std::logic_error("Full range PID position is not available yet");
   return slave_status.status_5.pid_pos_full_now;
 }
 
