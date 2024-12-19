@@ -140,13 +140,12 @@ void socketcan_master::register_slave(uint8_t controller_id) {
   slaves_status_[controller_id] = {};
 }
 
-std::optional<socketcan_status> socketcan_master::get_slave_status(
-    uint8_t controller_id) {
+socketcan_status socketcan_master::get_slave_status(uint8_t controller_id) {
   try {
     std::lock_guard<std::mutex> lock(monitor_mutex_);
     return slaves_status_.at(controller_id);
   } catch (std::out_of_range) {
-    return std::nullopt;
+    throw std::logic_error("Slave is not registered");
   }
 }
 

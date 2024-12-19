@@ -284,12 +284,7 @@ void vesc::write(const void* buf, size_t size) {
 }
 
 socketcan_status vesc::get_status() {
-  auto slave_status_opt = can_master_->get_slave_status(controller_id_);
-  if (!slave_status_opt.has_value()) {
-    throw std::logic_error(
-        "Slave status not found, maybe the slave have not been registered");
-  }
-  return slave_status_opt.value();
+  return can_master_->get_slave_status(controller_id_);
 }
 
 }  // namespace vesccom
