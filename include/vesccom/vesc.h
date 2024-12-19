@@ -67,6 +67,14 @@ class vesc {
   void set_pos(double pos);
   void set_pos_full(float pos);
 
+  int get_erpm();
+  float get_current();
+  float get_duty();
+  float get_temp_fet();
+  float get_temp_motor();
+  float get_current_in();
+  float get_pid_pos();
+  float get_v_in();
   float get_pid_pos_full();
 
  private:

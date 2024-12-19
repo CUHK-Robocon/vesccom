@@ -148,6 +148,86 @@ void vesc::set_pos_full(float pos) {
   send_payload_mut(buf);
 }
 
+int vesc::get_erpm() {
+  if (!is_slave())
+    throw std::logic_error("Getter not implemented for serial VESCs yet");
+
+  socketcan_status slave_status = get_status();
+  if (!slave_status.status_1.ready)
+    throw std::logic_error("ERPM is not available yet");
+  return slave_status.status_1.rpm;
+}
+
+float vesc::get_current() {
+  if (!is_slave())
+    throw std::logic_error("Getter not implemented for serial VESCs yet");
+
+  socketcan_status slave_status = get_status();
+  if (!slave_status.status_1.ready)
+    throw std::logic_error("Motor current is not available yet");
+  return slave_status.status_1.current;
+}
+
+float vesc::get_duty() {
+  if (!is_slave())
+    throw std::logic_error("Getter not implemented for serial VESCs yet");
+
+  socketcan_status slave_status = get_status();
+  if (!slave_status.status_1.ready)
+    throw std::logic_error("Duty cycle is not available yet");
+  return slave_status.status_1.duty;
+}
+
+float vesc::get_temp_fet() {
+  if (!is_slave())
+    throw std::logic_error("Getter not implemented for serial VESCs yet");
+
+  socketcan_status slave_status = get_status();
+  if (!slave_status.status_4.ready)
+    throw std::logic_error("FET temperature is not available yet");
+  return slave_status.status_4.temp_fet;
+}
+
+float vesc::get_temp_motor() {
+  if (!is_slave())
+    throw std::logic_error("Getter not implemented for serial VESCs yet");
+
+  socketcan_status slave_status = get_status();
+  if (!slave_status.status_4.ready)
+    throw std::logic_error("Motor temperature is not available yet");
+  return slave_status.status_4.temp_motor;
+}
+
+float vesc::get_current_in() {
+  if (!is_slave())
+    throw std::logic_error("Getter not implemented for serial VESCs yet");
+
+  socketcan_status slave_status = get_status();
+  if (!slave_status.status_4.ready)
+    throw std::logic_error("Input current is not available yet");
+  return slave_status.status_4.current_in;
+}
+
+float vesc::get_pid_pos() {
+  if (!is_slave())
+    throw std::logic_error("Getter not implemented for serial VESCs yet");
+
+  socketcan_status slave_status = get_status();
+  if (!slave_status.status_4.ready)
+    throw std::logic_error("PID position is not available yet");
+  return slave_status.status_4.pid_pos_now;
+}
+
+float vesc::get_v_in() {
+  if (!is_slave())
+    throw std::logic_error("Getter not implemented for serial VESCs yet");
+
+  socketcan_status slave_status = get_status();
+  if (!slave_status.status_5.ready)
+    throw std::logic_error("Input voltage is not available yet");
+  return slave_status.status_5.v_in;
+}
+
 float vesc::get_pid_pos_full() {
   if (!is_slave())
     throw std::logic_error("Getter not implemented for serial VESCs yet");
