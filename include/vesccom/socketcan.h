@@ -3,14 +3,13 @@
 
 #include <linux/can.h>
 
+#include <condition_variable>
 #include <cstddef>
 #include <cstdint>
 #include <mutex>
 #include <optional>
 #include <thread>
 #include <unordered_map>
-
-#include "sync.h"
 
 namespace vesccom {
 
@@ -76,9 +75,11 @@ class socketcan_master {
   std::thread monitor_thread_;
   int monitor_stop_efd_;
   std::unordered_map<uint8_t, socketcan_status> slaves_status_;
-  std::mutex slaves_status_mutex_;
-
-  sync::completion_notifier pid_pos_full_now_all_ready_notifier_;
+  int pid_pos_full_now_ready_count_ = 0;
+  std::condition_variable pid_pos_full_now_all_ready_cv_;
+  // This mutex is guarding both slaves status and the CV's condition as we want
+  // the slaves status to be visible on the waiting thread when notified.
+  std::mutex monitor_mutex_;
 };
 
 }  // namespace vesccom

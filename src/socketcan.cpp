@@ -143,7 +143,7 @@ void socketcan_master::register_slave(uint8_t controller_id) {
 std::optional<socketcan_status> socketcan_master::get_slave_status(
     uint8_t controller_id) {
   try {
-    std::lock_guard<std::mutex> lock(slaves_status_mutex_);
+    std::lock_guard<std::mutex> lock(monitor_mutex_);
     return slaves_status_.at(controller_id);
   } catch (std::out_of_range) {
     return std::nullopt;
@@ -151,7 +151,9 @@ std::optional<socketcan_status> socketcan_master::get_slave_status(
 }
 
 void socketcan_master::wait_pid_pos_full_now_all_ready() {
-  pid_pos_full_now_all_ready_notifier_.wait();
+  std::unique_lock<std::mutex> lock(monitor_mutex_);
+  pid_pos_full_now_all_ready_cv_.wait(
+      lock, [this] { return is_pid_pos_full_now_all_ready_unlocked(); });
 }
 
 void socketcan_master::start_monitor_thread() {
@@ -186,13 +188,11 @@ void socketcan_master::reset_monitor_stop_efd() {
 }
 
 bool socketcan_master::is_pid_pos_full_now_all_ready_unlocked() {
-  for (const auto& [id, status] : slaves_status_)
-    if (!status.status_5.ready) return false;
-  return true;
+  return pid_pos_full_now_ready_count_ == slaves_status_.size();
 }
 
 void socketcan_master::process_can_frame(can_frame frame) {
-  std::lock_guard<std::mutex> lock(slaves_status_mutex_);
+  std::lock_guard<std::mutex> lock(monitor_mutex_);
 
   uint8_t id = frame.can_id & 0xFF;
   if (!slaves_status_.contains(id)) return;
@@ -223,12 +223,18 @@ void socketcan_master::process_can_frame(can_frame frame) {
       break;
 
     case CAN_PACKET_STATUS_5:
+      if (!status.status_5.ready) ++pid_pos_full_now_ready_count_;
+
       status.status_5.ready = true;
       status.status_5.pid_pos_full_now = buf::get_float32_be(frame.data, ind);
       status.status_5.v_in = buf::get_int16_be(frame.data, ind) / 10.0;
 
-      if (is_pid_pos_full_now_all_ready_unlocked())
-        pid_pos_full_now_all_ready_notifier_.notify();
+      if (is_pid_pos_full_now_all_ready_unlocked()) {
+        // TODO: It is possible that the waiter will block again for the mutex.
+        // The best solution is to notify after the lock guard is dropped. For
+        // readibility, it is keep as is for now.
+        pid_pos_full_now_all_ready_cv_.notify_all();
+      }
 
       break;
 
