@@ -276,4 +276,141 @@ void master::monitor_thread_f() {
   }
 }
 
+slave::slave(master& can_master, uint8_t controller_id)
+    : can_master_(&can_master), controller_id_(controller_id) {
+  can_master.register_slave(controller_id);
+}
+
+void slave::send_payload_mut(std::vector<uint8_t>& payload) {
+  can_master_->write(controller_id_, payload.data(), payload.size());
+}
+
+void slave::send_payload(const uint8_t* data, size_t size) {
+  can_master_->write(controller_id_, data, size);
+}
+
+void slave::set_duty_cycle(double duty_cycle) {
+  std::vector<uint8_t> buf;
+
+  buf.push_back(COMM_SET_DUTY);
+
+  boost::endian::big_int32_buf_t duty_cycle_buf(duty_cycle * 1e5);
+  buf.insert(buf.end(), duty_cycle_buf.data(),
+             duty_cycle_buf.data() + sizeof(duty_cycle_buf));
+
+  send_payload_mut(buf);
+}
+
+void slave::set_erpm(int erpm) {
+  std::vector<uint8_t> buf;
+
+  buf.push_back(COMM_SET_RPM);
+
+  boost::endian::big_int32_buf_t erpm_buf(erpm);
+  buf.insert(buf.end(), erpm_buf.data(), erpm_buf.data() + sizeof(erpm_buf));
+
+  send_payload_mut(buf);
+}
+
+void slave::set_current(double current) {
+  std::vector<uint8_t> buf;
+
+  buf.push_back(COMM_SET_CURRENT);
+
+  boost::endian::big_int32_buf_t current_buf(current * 1e3);
+  buf.insert(buf.end(), current_buf.data(),
+             current_buf.data() + sizeof(current_buf));
+
+  send_payload_mut(buf);
+}
+
+void slave::set_pos(double pos) {
+  std::vector<uint8_t> buf;
+
+  buf.push_back(COMM_SET_POS);
+
+  boost::endian::big_int32_buf_t pos_buf(pos * 1e6);
+  buf.insert(buf.end(), pos_buf.data(), pos_buf.data() + sizeof(pos_buf));
+
+  send_payload_mut(buf);
+}
+
+void slave::set_pos_full(float pos) {
+  std::vector<uint8_t> buf;
+
+  buf.push_back(COMM_SET_POS_FULL);
+
+  boost::endian::big_float32_buf_t pos_buf(pos);
+  buf.insert(buf.end(), pos_buf.data(), pos_buf.data() + sizeof(float));
+
+  send_payload_mut(buf);
+}
+
+int slave::get_erpm() {
+  slave_status slave_status = get_status();
+  if (!slave_status.status_1.ready)
+    throw std::logic_error("ERPM is not available yet");
+  return slave_status.status_1.rpm;
+}
+
+float slave::get_current() {
+  slave_status slave_status = get_status();
+  if (!slave_status.status_1.ready)
+    throw std::logic_error("Motor current is not available yet");
+  return slave_status.status_1.current;
+}
+
+float slave::get_duty() {
+  slave_status slave_status = get_status();
+  if (!slave_status.status_1.ready)
+    throw std::logic_error("Duty cycle is not available yet");
+  return slave_status.status_1.duty;
+}
+
+float slave::get_temp_fet() {
+  slave_status slave_status = get_status();
+  if (!slave_status.status_4.ready)
+    throw std::logic_error("FET temperature is not available yet");
+  return slave_status.status_4.temp_fet;
+}
+
+float slave::get_temp_motor() {
+  slave_status slave_status = get_status();
+  if (!slave_status.status_4.ready)
+    throw std::logic_error("Motor temperature is not available yet");
+  return slave_status.status_4.temp_motor;
+}
+
+float slave::get_current_in() {
+  slave_status slave_status = get_status();
+  if (!slave_status.status_4.ready)
+    throw std::logic_error("Input current is not available yet");
+  return slave_status.status_4.current_in;
+}
+
+float slave::get_pid_pos() {
+  slave_status slave_status = get_status();
+  if (!slave_status.status_4.ready)
+    throw std::logic_error("PID position is not available yet");
+  return slave_status.status_4.pid_pos_now;
+}
+
+float slave::get_v_in() {
+  slave_status slave_status = get_status();
+  if (!slave_status.status_5.ready)
+    throw std::logic_error("Input voltage is not available yet");
+  return slave_status.status_5.v_in;
+}
+
+float slave::get_pid_pos_full() {
+  slave_status slave_status = get_status();
+  if (!slave_status.status_5.ready)
+    throw std::logic_error("Full range PID position is not available yet");
+  return slave_status.status_5.pid_pos_full_now;
+}
+
+slave_status slave::get_status() {
+  return can_master_->get_slave_status(controller_id_);
+}
+
 }  // namespace vesccom::socketcan

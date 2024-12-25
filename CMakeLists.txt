@@ -12,7 +12,7 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 add_library(vesccom STATIC
-    src/packet.cpp
+    src/serial.cpp
     src/socketcan.cpp
     src/vesc.cpp
 )
