@@ -28,7 +28,7 @@ class vesc {
 
   // Constructs an instance representing a slave connected to a SocketCAN
   // master.
-  vesc(socketcan_master& can_master, uint8_t controller_id);
+  vesc(socketcan::master& can_master, uint8_t controller_id);
 
   vesc(const vesc&) = delete;
 
@@ -95,14 +95,14 @@ class vesc {
   void write(const void* buf, size_t size);
 
   // Note that the object is NOT checked if it represents a slave.
-  socketcan_status get_status_unchecked();
+  socketcan::slave_status get_status_unchecked();
 
   inline static std::thread keep_alive_thread_;
   inline static bool keep_alive_thread_should_stop_ = false;
   inline static std::unordered_set<vesc*> keep_alive_instances_;
   inline static std::mutex keep_alive_state_mutex_;
 
-  socketcan_master* can_master_ = nullptr;
+  socketcan::master* can_master_ = nullptr;
   uint8_t controller_id_;
 
   // Must be declared before `serial_` for the correct initialization order.

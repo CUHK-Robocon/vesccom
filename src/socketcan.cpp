@@ -16,12 +16,12 @@
 #include "boost/crc.hpp"
 #include "vesccom/buf.h"
 
-namespace vesccom {
+namespace vesccom::socketcan {
 
 const uint8_t TO_SLAVE_COMMANDS_PROCESS_PACKET = 0;
 const uint8_t MASTER_CONTROLLER_ID = 0;
 
-socketcan_master::socketcan_master(const char* device_name) {
+master::master(const char* device_name) {
   socket_ = socket(PF_CAN, SOCK_RAW, CAN_RAW);
   if (socket_ == -1)
     throw std::runtime_error("Failed to open SocketCAN socket");
@@ -53,7 +53,7 @@ socketcan_master::socketcan_master(const char* device_name) {
   }
 }
 
-socketcan_master::~socketcan_master() {
+master::~master() {
   close(socket_);
   close(monitor_stop_efd_);
 }
@@ -71,8 +71,7 @@ void can_write(int socket, uint8_t controller_id, uint8_t packet_type,
   write(socket, &frame, sizeof(can_frame));
 }
 
-void socketcan_master::write(uint8_t controller_id, const uint8_t* data,
-                             size_t len) {
+void master::write(uint8_t controller_id, const uint8_t* data, size_t len) {
   uint8_t send_buffer[8];
 
   if (len <= 6) {
@@ -136,11 +135,11 @@ void socketcan_master::write(uint8_t controller_id, const uint8_t* data,
             ind);
 }
 
-void socketcan_master::register_slave(uint8_t controller_id) {
+void master::register_slave(uint8_t controller_id) {
   slaves_status_[controller_id] = {};
 }
 
-socketcan_status socketcan_master::get_slave_status(uint8_t controller_id) {
+slave_status master::get_slave_status(uint8_t controller_id) {
   try {
     std::lock_guard<std::mutex> lock(monitor_mutex_);
     return slaves_status_.at(controller_id);
@@ -149,18 +148,18 @@ socketcan_status socketcan_master::get_slave_status(uint8_t controller_id) {
   }
 }
 
-void socketcan_master::wait_pid_pos_full_now_all_ready() {
+void master::wait_pid_pos_full_now_all_ready() {
   std::unique_lock<std::mutex> lock(monitor_mutex_);
   pid_pos_full_now_all_ready_cv_.wait(
       lock, [this] { return is_pid_pos_full_now_all_ready_unlocked(); });
 }
 
-void socketcan_master::start_monitor_thread() {
+void master::start_monitor_thread() {
   reset_monitor_stop_efd();
-  monitor_thread_ = std::thread(&socketcan_master::monitor_thread_f, this);
+  monitor_thread_ = std::thread(&master::monitor_thread_f, this);
 }
 
-void socketcan_master::stop_monitor_thread() {
+void master::stop_monitor_thread() {
   uint64_t MONITOR_STOP_EFD_INC_VAL = 1;
   if (::write(monitor_stop_efd_, &MONITOR_STOP_EFD_INC_VAL, sizeof(uint64_t)) ==
       -1) {
@@ -174,9 +173,9 @@ void socketcan_master::stop_monitor_thread() {
   }
 }
 
-void socketcan_master::join_monitor_thread() { monitor_thread_.join(); }
+void master::join_monitor_thread() { monitor_thread_.join(); }
 
-void socketcan_master::reset_monitor_stop_efd() {
+void master::reset_monitor_stop_efd() {
   uint64_t tmp;
   // We only need to handle non-EAGAIN errors. As we are resetting monitor stop
   // eventfd to zero, it is okay for the counter to be zero when we read it.
@@ -186,11 +185,11 @@ void socketcan_master::reset_monitor_stop_efd() {
   }
 }
 
-bool socketcan_master::is_pid_pos_full_now_all_ready_unlocked() {
+bool master::is_pid_pos_full_now_all_ready_unlocked() {
   return pid_pos_full_now_ready_count_ == slaves_status_.size();
 }
 
-void socketcan_master::process_can_frame(can_frame frame) {
+void master::process_can_frame(can_frame frame) {
   std::lock_guard<std::mutex> lock(monitor_mutex_);
 
   uint8_t id = frame.can_id & 0xFF;
@@ -202,7 +201,7 @@ void socketcan_master::process_can_frame(can_frame frame) {
     return;
   }
 
-  socketcan_status& status = slaves_status_[id];
+  slave_status& status = slaves_status_[id];
   int ind = 0;
 
   switch (cmd) {
@@ -242,7 +241,7 @@ void socketcan_master::process_can_frame(can_frame frame) {
   }
 }
 
-void socketcan_master::monitor_thread_f() {
+void master::monitor_thread_f() {
   pollfd pfds[2];
 
   pollfd& can_pfd = pfds[0] = {
@@ -277,4 +276,4 @@ void socketcan_master::monitor_thread_f() {
   }
 }
 
-}  // namespace vesccom
+}  // namespace vesccom::socketcan
