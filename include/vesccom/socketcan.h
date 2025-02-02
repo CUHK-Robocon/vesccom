@@ -104,8 +104,10 @@ class slave : public vesc {
   void set_duty_cycle(double duty_cycle);
   void set_erpm(int erpm);
   void set_current(double current);
+  void set_pos_abs(double pos);
   void set_pos(double pos);
-  void set_pos_full(float pos);
+  void set_pos_full_abs(float pos);
+  void set_pos_full(double pos);
 
   int get_erpm();
   float get_current();
@@ -113,15 +115,23 @@ class slave : public vesc {
   float get_temp_fet();
   float get_temp_motor();
   float get_current_in();
-  float get_pid_pos();
+  float get_pid_pos_abs();
+  double get_pid_pos();
   float get_v_in();
-  float get_pid_pos_full();
+  float get_pid_pos_full_abs();
+  double get_pid_pos_full();
+
+  void set_zero();
+  void set_zero(double offset);
+  void reset_zero();
 
  private:
   socketcan::slave_status get_status();
 
   socketcan::master* can_master_;
   uint8_t controller_id_;
+
+  double zero_full = 0;
 };
 
 }  // namespace vesccom::socketcan

@@ -209,7 +209,7 @@ void vesc::set_current(double current) {
   send_payload_mut(buf);
 }
 
-void vesc::set_pos(double pos) {
+void vesc::set_pos_abs(double pos) {
   std::vector<uint8_t> buf;
 
   buf.push_back(COMM_SET_POS);
@@ -220,7 +220,7 @@ void vesc::set_pos(double pos) {
   send_payload_mut(buf);
 }
 
-void vesc::set_pos_full(float pos) {
+void vesc::set_pos_full_abs(float pos) {
   std::vector<uint8_t> buf;
 
   buf.push_back(COMM_SET_POS_FULL);

@@ -84,8 +84,8 @@ class vesc : public ::vesccom::vesc {
   void set_duty_cycle(double duty_cycle);
   void set_erpm(int erpm);
   void set_current(double current);
-  void set_pos(double pos);
-  void set_pos_full(float pos);
+  void set_pos_abs(double pos);
+  void set_pos_full_abs(float pos);
 
  private:
   // Reads and blocks until `size` bytes have been read.
