@@ -14,6 +14,7 @@
 
 #include "bldc/datatypes.h"
 #include "boost/crc.hpp"
+#include "spdlog/spdlog.h"
 #include "vesccom/buf.h"
 #include "vesccom/util.h"
 
@@ -222,7 +223,10 @@ void master::process_can_frame(can_frame frame) {
       break;
 
     case CAN_PACKET_STATUS_5:
-      if (!status.status_5.ready) ++pid_pos_full_now_ready_count_;
+      if (!status.status_5.ready) {
+        ++pid_pos_full_now_ready_count_;
+        spdlog::info("Slave {} full PID position is ready", id);
+      }
 
       status.status_5.ready = true;
       status.status_5.pid_pos_full_now = buf::get_float32_be(frame.data, ind);
