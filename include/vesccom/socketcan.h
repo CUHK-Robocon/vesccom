@@ -6,10 +6,9 @@
 #include <condition_variable>
 #include <cstddef>
 #include <cstdint>
-#include <map>
 #include <mutex>
-#include <string>
 #include <thread>
+#include <unordered_map>
 #include <vector>
 
 #include "vesccom/vesc.h"
@@ -44,7 +43,7 @@ struct slave_status {
 
 class master {
  public:
-  explicit master(const char* device_name);
+  master(const char* device_name);
 
   master(const master&) = delete;
 
@@ -79,24 +78,22 @@ class master {
   void reset_monitor_stop_efd();
 
   bool is_all_ready_unlocked();
-  void log_ready_slaves();
   void process_can_frame(can_frame frame);
 
   void monitor_thread_f();
 
   int socket_;
-  std::string device_name_;
 
   std::thread monitor_thread_;
   int monitor_stop_efd_;
-  std::map<uint8_t, slave_status> slaves_status_;
+  std::unordered_map<uint8_t, slave_status> slaves_status_;
   int status_1_ready_count_ = 0;
   int status_4_ready_count_ = 0;
   int status_5_ready_count_ = 0;
   std::condition_variable is_all_ready_cv_;
   // This mutex is guarding both slaves status and the CV's condition as we want
   // the slaves status to be visible on the waiting thread when notified.
-  std::mutex mutex_;
+  std::mutex monitor_mutex_;
 };
 
 class slave : public vesc {
