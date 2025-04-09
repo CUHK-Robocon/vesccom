@@ -150,10 +150,9 @@ slave_status master::get_slave_status(uint8_t controller_id) {
   }
 }
 
-void master::wait_pid_pos_full_now_all_ready() {
+void master::wait_all_ready() {
   std::unique_lock<std::mutex> lock(monitor_mutex_);
-  pid_pos_full_now_all_ready_cv_.wait(
-      lock, [this] { return is_pid_pos_full_now_all_ready_unlocked(); });
+  is_all_ready_cv_.wait(lock, [this] { return is_all_ready_unlocked(); });
 }
 
 void master::start_monitor_thread() {
@@ -187,8 +186,10 @@ void master::reset_monitor_stop_efd() {
   }
 }
 
-bool master::is_pid_pos_full_now_all_ready_unlocked() {
-  return pid_pos_full_now_ready_count_ == slaves_status_.size();
+bool master::is_all_ready_unlocked() {
+  std::size_t count = slaves_status_.size();
+  return status_1_ready_count_ == count && status_4_ready_count_ == count &&
+         status_5_ready_count_ == count;
 }
 
 void master::process_can_frame(can_frame frame) {
@@ -208,41 +209,44 @@ void master::process_can_frame(can_frame frame) {
 
   switch (cmd) {
     case CAN_PACKET_STATUS:
+      if (!status.status_1.ready) ++status_1_ready_count_;
+
       status.status_1.ready = true;
       status.status_1.rpm = buf::get_int32_be(frame.data, ind);
       status.status_1.current = buf::get_int16_be(frame.data, ind) / 10.0;
       status.status_1.duty = buf::get_int16_be(frame.data, ind) / 1000.0;
+
       break;
 
     case CAN_PACKET_STATUS_4:
+      if (!status.status_4.ready) ++status_4_ready_count_;
+
       status.status_4.ready = true;
       status.status_4.temp_fet = buf::get_int16_be(frame.data, ind) / 10.0;
       status.status_4.temp_motor = buf::get_int16_be(frame.data, ind) / 10.0;
       status.status_4.current_in = buf::get_int16_be(frame.data, ind) / 10.0;
       status.status_4.pid_pos_now = buf::get_int16_be(frame.data, ind) / 50.0;
+
       break;
 
     case CAN_PACKET_STATUS_5:
-      if (!status.status_5.ready) {
-        ++pid_pos_full_now_ready_count_;
-        spdlog::info("Slave {} full PID position is ready", id);
-      }
+      if (!status.status_5.ready) ++status_5_ready_count_;
 
       status.status_5.ready = true;
       status.status_5.pid_pos_full_now = buf::get_float32_be(frame.data, ind);
       status.status_5.v_in = buf::get_int16_be(frame.data, ind) / 10.0;
 
-      if (is_pid_pos_full_now_all_ready_unlocked()) {
-        // TODO: It is possible that the waiter will block again for the mutex.
-        // The best solution is to notify after the lock guard is dropped. For
-        // readibility, it is keep as is for now.
-        pid_pos_full_now_all_ready_cv_.notify_all();
-      }
-
       break;
 
     default:
       return;
+  }
+
+  if (is_all_ready_unlocked()) {
+    // TODO: It is possible that the waiter will block again for the mutex.
+    // The best solution is to notify after the lock guard is dropped. For
+    // readibility, it is keep as is for now.
+    is_all_ready_cv_.notify_all();
   }
 }
 

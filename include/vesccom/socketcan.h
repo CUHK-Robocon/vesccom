@@ -66,8 +66,8 @@ class master {
   // Throws `std::logic_error` if the slave is not registered.
   slave_status get_slave_status(uint8_t controller_id);
 
-  // Blocks until full range PID position is ready.
-  void wait_pid_pos_full_now_all_ready();
+  // Blocks until all status messages are received from all slaves.
+  void wait_all_ready();
 
   void start_monitor_thread();
   void stop_monitor_thread();
@@ -77,7 +77,7 @@ class master {
   // Resets monitor stop eventfd counter to zero.
   void reset_monitor_stop_efd();
 
-  bool is_pid_pos_full_now_all_ready_unlocked();
+  bool is_all_ready_unlocked();
   void process_can_frame(can_frame frame);
 
   void monitor_thread_f();
@@ -87,8 +87,10 @@ class master {
   std::thread monitor_thread_;
   int monitor_stop_efd_;
   std::unordered_map<uint8_t, slave_status> slaves_status_;
-  int pid_pos_full_now_ready_count_ = 0;
-  std::condition_variable pid_pos_full_now_all_ready_cv_;
+  int status_1_ready_count_ = 0;
+  int status_4_ready_count_ = 0;
+  int status_5_ready_count_ = 0;
+  std::condition_variable is_all_ready_cv_;
   // This mutex is guarding both slaves status and the CV's condition as we want
   // the slaves status to be visible on the waiting thread when notified.
   std::mutex monitor_mutex_;
