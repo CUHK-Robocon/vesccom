@@ -23,7 +23,7 @@ namespace vesccom::socketcan {
 const uint8_t TO_SLAVE_COMMANDS_PROCESS_PACKET = 0;
 const uint8_t MASTER_CONTROLLER_ID = 0;
 
-master::master(const char* device_name) {
+master::master(const char* device_name) : device_name_(device_name) {
   socket_ = socket(PF_CAN, SOCK_RAW, CAN_RAW);
   if (socket_ == -1)
     throw std::runtime_error("Failed to open SocketCAN socket");
@@ -143,7 +143,7 @@ void master::register_slave(uint8_t controller_id) {
 
 slave_status master::get_slave_status(uint8_t controller_id) {
   try {
-    std::lock_guard<std::mutex> lock(monitor_mutex_);
+    std::lock_guard<std::mutex> lock(mutex_);
     return slaves_status_.at(controller_id);
   } catch (std::out_of_range) {
     throw std::logic_error("Slave is not registered");
@@ -151,7 +151,7 @@ slave_status master::get_slave_status(uint8_t controller_id) {
 }
 
 void master::wait_all_ready() {
-  std::unique_lock<std::mutex> lock(monitor_mutex_);
+  std::unique_lock<std::mutex> lock(mutex_);
   is_all_ready_cv_.wait(lock, [this] { return is_all_ready_unlocked(); });
 }
 
@@ -192,8 +192,13 @@ bool master::is_all_ready_unlocked() {
          status_5_ready_count_ == count;
 }
 
+bool is_slave_ready(const slave_status& status) {
+  return status.status_1.ready && status.status_4.ready &&
+         status.status_5.ready;
+}
+
 void master::process_can_frame(can_frame frame) {
-  std::lock_guard<std::mutex> lock(monitor_mutex_);
+  std::lock_guard<std::mutex> lock(mutex_);
 
   uint8_t id = frame.can_id & 0xFF;
   if (!slaves_status_.contains(id)) return;
@@ -206,6 +211,8 @@ void master::process_can_frame(can_frame frame) {
 
   slave_status& status = slaves_status_[id];
   int ind = 0;
+
+  bool ready = is_slave_ready(status);
 
   switch (cmd) {
     case CAN_PACKET_STATUS:
@@ -241,6 +248,9 @@ void master::process_can_frame(can_frame frame) {
     default:
       return;
   }
+
+  if (!ready && is_slave_ready(status))
+    spdlog::info("Master `{}` slave {} is ready", device_name_, id);
 
   if (is_all_ready_unlocked()) {
     // TODO: It is possible that the waiter will block again for the mutex.

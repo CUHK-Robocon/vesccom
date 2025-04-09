@@ -7,6 +7,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <mutex>
+#include <string>
 #include <thread>
 #include <unordered_map>
 #include <vector>
@@ -43,7 +44,7 @@ struct slave_status {
 
 class master {
  public:
-  master(const char* device_name);
+  explicit master(const char* device_name);
 
   master(const master&) = delete;
 
@@ -83,6 +84,7 @@ class master {
   void monitor_thread_f();
 
   int socket_;
+  std::string device_name_;
 
   std::thread monitor_thread_;
   int monitor_stop_efd_;
@@ -93,7 +95,7 @@ class master {
   std::condition_variable is_all_ready_cv_;
   // This mutex is guarding both slaves status and the CV's condition as we want
   // the slaves status to be visible on the waiting thread when notified.
-  std::mutex monitor_mutex_;
+  std::mutex mutex_;
 };
 
 class slave : public vesc {
