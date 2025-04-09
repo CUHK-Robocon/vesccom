@@ -9,6 +9,7 @@
 #include <unistd.h>
 
 #include <cstring>
+#include <sstream>
 #include <stdexcept>
 #include <utility>
 
@@ -23,7 +24,7 @@ namespace vesccom::socketcan {
 const uint8_t TO_SLAVE_COMMANDS_PROCESS_PACKET = 0;
 const uint8_t MASTER_CONTROLLER_ID = 0;
 
-master::master(const char* device_name) {
+master::master(const char* device_name) : device_name_(device_name) {
   socket_ = socket(PF_CAN, SOCK_RAW, CAN_RAW);
   if (socket_ == -1)
     throw std::runtime_error("Failed to open SocketCAN socket");
@@ -143,7 +144,7 @@ void master::register_slave(uint8_t controller_id) {
 
 slave_status master::get_slave_status(uint8_t controller_id) {
   try {
-    std::lock_guard<std::mutex> lock(monitor_mutex_);
+    std::lock_guard<std::mutex> lock(mutex_);
     return slaves_status_.at(controller_id);
   } catch (std::out_of_range) {
     throw std::logic_error("Slave is not registered");
@@ -151,7 +152,7 @@ slave_status master::get_slave_status(uint8_t controller_id) {
 }
 
 void master::wait_all_ready() {
-  std::unique_lock<std::mutex> lock(monitor_mutex_);
+  std::unique_lock<std::mutex> lock(mutex_);
   is_all_ready_cv_.wait(lock, [this] { return is_all_ready_unlocked(); });
 }
 
@@ -192,8 +193,46 @@ bool master::is_all_ready_unlocked() {
          status_5_ready_count_ == count;
 }
 
+void master::log_ready_slaves() {
+  std::stringstream ids;
+
+  auto it = slaves_status_.begin();
+  int start = it->first;
+  int end = it->first;
+  ++it;
+
+  for (; it != slaves_status_.end(); ++it) {
+    if (it->first == end + 1) {
+      end = it->first;
+      continue;
+    }
+
+    if (start == end) {
+      ids << start;
+    } else {
+      ids << start;
+      ids << '-';
+      ids << end;
+    }
+    ids << ", ";
+
+    start = it->first;
+    end = it->first;
+  }
+
+  if (start == end) {
+    ids << start;
+  } else {
+    ids << start;
+    ids << '-';
+    ids << end;
+  }
+
+  spdlog::info("Master `{}` ready slaves: {}", device_name_, ids.str());
+}
+
 void master::process_can_frame(can_frame frame) {
-  std::lock_guard<std::mutex> lock(monitor_mutex_);
+  std::lock_guard<std::mutex> lock(mutex_);
 
   uint8_t id = frame.can_id & 0xFF;
   if (!slaves_status_.contains(id)) return;
@@ -209,7 +248,14 @@ void master::process_can_frame(can_frame frame) {
 
   switch (cmd) {
     case CAN_PACKET_STATUS:
-      if (!status.status_1.ready) ++status_1_ready_count_;
+      if (!status.status_1.ready) {
+        ++status_1_ready_count_;
+
+        if (is_all_ready_unlocked()) {
+          log_ready_slaves();
+          is_all_ready_cv_.notify_all();
+        }
+      }
 
       status.status_1.ready = true;
       status.status_1.rpm = buf::get_int32_be(frame.data, ind);
@@ -219,7 +265,14 @@ void master::process_can_frame(can_frame frame) {
       break;
 
     case CAN_PACKET_STATUS_4:
-      if (!status.status_4.ready) ++status_4_ready_count_;
+      if (!status.status_4.ready) {
+        ++status_4_ready_count_;
+
+        if (is_all_ready_unlocked()) {
+          log_ready_slaves();
+          is_all_ready_cv_.notify_all();
+        }
+      }
 
       status.status_4.ready = true;
       status.status_4.temp_fet = buf::get_int16_be(frame.data, ind) / 10.0;
@@ -230,7 +283,14 @@ void master::process_can_frame(can_frame frame) {
       break;
 
     case CAN_PACKET_STATUS_5:
-      if (!status.status_5.ready) ++status_5_ready_count_;
+      if (!status.status_5.ready) {
+        ++status_5_ready_count_;
+
+        if (is_all_ready_unlocked()) {
+          log_ready_slaves();
+          is_all_ready_cv_.notify_all();
+        }
+      }
 
       status.status_5.ready = true;
       status.status_5.pid_pos_full_now = buf::get_float32_be(frame.data, ind);
@@ -240,13 +300,6 @@ void master::process_can_frame(can_frame frame) {
 
     default:
       return;
-  }
-
-  if (is_all_ready_unlocked()) {
-    // TODO: It is possible that the waiter will block again for the mutex.
-    // The best solution is to notify after the lock guard is dropped. For
-    // readibility, it is keep as is for now.
-    is_all_ready_cv_.notify_all();
   }
 }
 
