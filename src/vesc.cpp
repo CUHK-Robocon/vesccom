@@ -1,6 +1,7 @@
 #include "vesccom/vesc.h"
 
 #include "bldc/datatypes.h"
+#include "vesccom/util.h"
 
 namespace vesccom {
 
@@ -32,6 +33,26 @@ void vesc::send_payload(const uint8_t* data, size_t size) {
 
   send_payload_mut(buf);
 }
+
+void vesc::set_pos(double pos) {
+  double pos_full = zero_full + pos;
+  double pos_norm = norm_0i_360e(pos_full);
+  set_pos_abs(pos_norm);
+}
+
+void vesc::set_pos_full(double pos) { set_pos_full_abs(zero_full + pos); }
+
+double vesc::get_pid_pos() {
+  return norm_0i_360e(get_pid_pos_abs() - zero_full);
+}
+
+double vesc::get_pid_pos_full() { return get_pid_pos_full_abs() - zero_full; }
+
+void vesc::set_zero(double current_angle) {
+  zero_full = get_pid_pos_full_abs() - current_angle;
+}
+
+void vesc::reset_zero() { zero_full = 0; }
 
 void vesc::keep_alive_thread_f() {
   while (true) {

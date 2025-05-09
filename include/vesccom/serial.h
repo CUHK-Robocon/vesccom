@@ -81,11 +81,13 @@ class vesc : public ::vesccom::vesc {
 
   void send_payload_mut(std::vector<uint8_t>& payload) override;
 
-  void set_duty_cycle(double duty_cycle);
-  void set_erpm(int erpm);
-  void set_current(double current);
-  void set_pos_abs(double pos);
-  void set_pos_full_abs(float pos);
+  void set_duty_cycle(double duty_cycle) override;
+  void set_erpm(int erpm) override;
+  void set_current(double current) override;
+  void set_pos_abs(double pos) override;
+  void set_pos_full_abs(float pos) override;
+
+  // TODO: `get_*` methods.
 
  private:
   // Reads and blocks until `size` bytes have been read.

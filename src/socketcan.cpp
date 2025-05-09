@@ -16,7 +16,6 @@
 #include "boost/crc.hpp"
 #include "spdlog/spdlog.h"
 #include "vesccom/buf.h"
-#include "vesccom/util.h"
 
 namespace vesccom::socketcan {
 
@@ -354,14 +353,6 @@ void slave::set_pos_abs(double pos) {
   send_payload_mut(buf);
 }
 
-void slave::set_pos(double pos) {
-  // Position is sent to the slave as integer after multiplying a scale
-  // constant. Normalize once before sending it to prevent precision loss.
-  double pos_full = zero_full + pos;
-  double pos_norm = norm_0i_360e(pos_full);
-  set_pos_abs(pos_norm);
-}
-
 void slave::set_pos_full_abs(float pos) {
   std::vector<uint8_t> buf;
 
@@ -372,8 +363,6 @@ void slave::set_pos_full_abs(float pos) {
 
   send_payload_mut(buf);
 }
-
-void slave::set_pos_full(double pos) { set_pos_full_abs(zero_full + pos); }
 
 int slave::get_erpm() {
   slave_status slave_status = get_status();
@@ -424,10 +413,6 @@ float slave::get_pid_pos_abs() {
   return slave_status.status_4.pid_pos_now;
 }
 
-double slave::get_pid_pos() {
-  return norm_0i_360e(get_pid_pos_abs() - zero_full);
-}
-
 float slave::get_v_in() {
   slave_status slave_status = get_status();
   if (!slave_status.status_5.ready)
@@ -441,16 +426,6 @@ float slave::get_pid_pos_full_abs() {
     throw std::logic_error("Full range PID position is not available yet");
   return slave_status.status_5.pid_pos_full_now;
 }
-
-double slave::get_pid_pos_full() { return get_pid_pos_full_abs() - zero_full; }
-
-void slave::set_zero() { zero_full = get_pid_pos_full_abs(); }
-
-void slave::set_zero(double current_angle) {
-  zero_full = get_pid_pos_full_abs() - current_angle;
-}
-
-void slave::reset_zero() { zero_full = 0; }
 
 slave_status slave::get_status() {
   return can_master_->get_slave_status(controller_id_);

@@ -105,37 +105,27 @@ class slave : public vesc {
   void send_payload_mut(std::vector<uint8_t>& payload) override;
   void send_payload(const uint8_t* data, size_t size) override;
 
-  void set_duty_cycle(double duty_cycle);
-  void set_erpm(int erpm);
-  void set_current(double current);
-  void set_pos_abs(double pos);
-  void set_pos(double pos);
-  void set_pos_full_abs(float pos);
-  void set_pos_full(double pos);
+  void set_duty_cycle(double duty_cycle) override;
+  void set_erpm(int erpm) override;
+  void set_current(double current) override;
+  void set_pos_abs(double pos) override;
+  void set_pos_full_abs(float pos) override;
 
-  int get_erpm();
-  float get_current();
-  float get_duty();
-  float get_temp_fet();
-  float get_temp_motor();
-  float get_current_in();
-  float get_pid_pos_abs();
-  double get_pid_pos();
-  float get_v_in();
-  float get_pid_pos_full_abs();
-  double get_pid_pos_full();
-
-  void set_zero();
-  void set_zero(double offset);
-  void reset_zero();
+  int get_erpm() override;
+  float get_current() override;
+  float get_duty() override;
+  float get_temp_fet() override;
+  float get_temp_motor() override;
+  float get_current_in() override;
+  float get_pid_pos_abs() override;
+  float get_v_in() override;
+  float get_pid_pos_full_abs() override;
 
  private:
   socketcan::slave_status get_status();
 
   socketcan::master* can_master_;
   uint8_t controller_id_;
-
-  double zero_full = 0;
 };
 
 }  // namespace vesccom::socketcan
